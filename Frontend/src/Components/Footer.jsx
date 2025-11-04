@@ -1,3 +1,5 @@
+import "./Components.css";
+
 const Footer = () => {
   return (
     <footer className="footer">
@@ -25,3 +27,4 @@ const Footer = () => {
     </footer>
   );
 };
+export default Footer;

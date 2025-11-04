@@ -1,3 +1,10 @@
+import React from "react";
+import { useNavigate } from "../App.jsx";
+import Header from "../Components/Header.jsx";
+import Footer from "../Components/Footer.jsx";
+import Card from "../Components/Card.jsx";
+import Button from "../Components/Button.jsx";
+import "./Pages.css";
 const LandingPage = () => {
   const navigate = useNavigate();
 
@@ -124,3 +131,4 @@ const LandingPage = () => {
     </div>
   );
 };
+export default LandingPage;

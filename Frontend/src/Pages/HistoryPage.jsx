@@ -1,3 +1,10 @@
+import React from "react";
+import { useNavigate } from "../App";
+import { Upload, FileText } from "lucide-react";
+import Header from "../Components/Header.jsx";
+import "./Pages.css";
+import Card from "../Components/Card.jsx";
+import { Button } from "../Components/Button.jsx";
 const HistoryPage = () => {
   const navigate = useNavigate();
 
@@ -100,3 +107,4 @@ const HistoryPage = () => {
     </div>
   );
 };
+export default HistoryPage;

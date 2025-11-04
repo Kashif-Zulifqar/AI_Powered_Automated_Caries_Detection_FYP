@@ -1,3 +1,11 @@
+import React from "react";
+import { useNavigate } from "../App";
+import { Bell, Upload, FileText } from "lucide-react";
+import { useAuth } from "../Contexts/AuthContext";
+import Header from "../Components/Header.jsx";
+import Card from "../Components/Card.jsx";
+import { Button } from "../Components/Button.jsx";
+import "./Pages.css";
 const DashboardPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -104,3 +112,4 @@ const DashboardPage = () => {
     </div>
   );
 };
+export default DashboardPage;

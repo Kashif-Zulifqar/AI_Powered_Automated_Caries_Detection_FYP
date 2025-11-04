@@ -1,3 +1,11 @@
+import React, { useState } from "react";
+import { useNavigate } from "../App";
+import { useAuth } from "../Contexts/AuthContext";
+import { useToast } from "../Contexts/ToastContext";
+import Header from "../Components/Header.jsx";
+import Card from "../Components/Card.jsx";
+import { Button } from "../Components/Button.jsx";
+import "./Pages.css";
 const SignupPage = () => {
   const [formData, setFormData] = useState({
     name: "",
@@ -97,3 +105,4 @@ const SignupPage = () => {
     </div>
   );
 };
+export default SignupPage;

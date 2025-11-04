@@ -1,3 +1,5 @@
+import React from "react";
+import "./Components.css";
 const Card = ({ children, className = "", onClick }) => {
   return (
     <div className={`card ${className}`} onClick={onClick}>
@@ -5,3 +7,4 @@ const Card = ({ children, className = "", onClick }) => {
     </div>
   );
 };
+export default Card;

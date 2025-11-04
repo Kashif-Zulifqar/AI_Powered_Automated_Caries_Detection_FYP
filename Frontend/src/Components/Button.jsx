@@ -1,3 +1,5 @@
+import React from "react";
+import "./Components.css";
 const Button = ({
   children,
   variant = "primary",
@@ -17,3 +19,4 @@ const Button = ({
     </button>
   );
 };
+export default Button;
