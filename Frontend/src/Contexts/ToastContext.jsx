@@ -29,3 +29,4 @@ const ToastProvider = ({ children }) => {
 };
 
 const useToast = () => useContext(ToastContext);
+export { ToastProvider, useToast };

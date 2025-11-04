@@ -1,3 +1,14 @@
+import React, { useState } from "react";
+import { useNavigate } from "../App.jsx";
+import { User, AlertCircle } from "lucide-react";
+import Header from "../Components/Header.jsx";
+import Card from "../Components/Card.jsx";
+import { Button } from "../Components/Button.jsx";
+import Modal from "../Components/Modal.jsx";
+import { useAuth } from "../Contexts/AuthContext.jsx";
+import { useToast } from "../Contexts/ToastContext";
+import "./Pages.css";
+
 const ProfilePage = () => {
   const { user, updateProfile } = useAuth();
   const { addToast } = useToast();
@@ -214,3 +225,4 @@ const ProfilePage = () => {
     </div>
   );
 };
+export default ProfilePage;

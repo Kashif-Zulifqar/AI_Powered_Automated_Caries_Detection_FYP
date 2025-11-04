@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { AuthProvider } from "./context/AuthContext";
-import { ToastProvider } from "./context/ToastContext";
+import { AuthProvider } from "./Contexts/AuthContext";
+import { ToastProvider } from "./Contexts/ToastContext";
 import LandingPage from "./Pages/LandingPage";
-import LoginPage from "./Pages/Login";
-import SignupPage from "./Pages/SignUp";
+import LoginPage from "./Pages/LoginPage";
+import SignupPage from "./Pages/SignupPage";
 import DashboardPage from "./Pages/Dashboard";
 import UploadPage from "./Pages/UploadPage";
-import ResultsPage from "./Pages/Results";
+import ResultsPage from "./Pages/ResultsPage";
 import HistoryPage from "./Pages/HistoryPage";
 import ReportDetailsPage from "./Pages/ReportDetailsPage";
-import ProfilePage from "./Pages/Profile";
+import ProfilePage from "./Pages/ProfilePage";
 
 // Simple Hash Router Hook
 export const useNavigate = () => {

@@ -1,3 +1,11 @@
+import React from "react";
+import { useNavigate } from "../App.jsx";
+import { FileText } from "lucide-react";
+import Header from "../Components/Header.jsx";
+import Card from "../Components/Card.jsx";
+import { Button } from "../Components/Button.jsx";
+import { useToast } from "../Contexts/ToastContext.jsx";
+import "./Pages.css";
 const ResultsPage = () => {
   const navigate = useNavigate();
   const { addToast } = useToast();
@@ -93,3 +101,4 @@ const ResultsPage = () => {
     </div>
   );
 };
+export default ResultsPage;

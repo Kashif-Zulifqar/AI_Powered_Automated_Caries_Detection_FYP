@@ -1,3 +1,5 @@
+import React from "react";
+import "./Components.css";
 const Modal = ({ isOpen, onClose, title, children }) => {
   if (!isOpen) return null;
 
@@ -15,3 +17,4 @@ const Modal = ({ isOpen, onClose, title, children }) => {
     </div>
   );
 };
+export default Modal;
