@@ -11,7 +11,6 @@
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
   },
-  "homepage": "https://Kashif-Zulifqar.github.io/AI_Powered_Automated_Caries_Detection_FYP",
   "dependencies": {
     "lucide-react": "^0.552.0",
     "react": "^19.1.1",
