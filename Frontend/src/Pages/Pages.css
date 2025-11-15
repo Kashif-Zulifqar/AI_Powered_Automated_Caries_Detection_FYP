@@ -3,6 +3,13 @@
    ============================================ */
 .landing-page {
   background: white;
+  background-image: url("/E:\FYP_Dental_AI\Frontend\public\dental1.jpg");
+  /* background-image: url("/E:\FYP_Dental_AI\Frontend\public\image2.avif"); */
+  background-size: cover;
+  /* background-position: center; */
+  background-repeat: no-repeat;
+  min-height: 100vh;
+  min-width: auto;
 }
 
 .hero {
@@ -32,11 +39,11 @@
   gap: 1rem;
 }
 
-.hero-image {
+/* .hero-image {
   display: flex;
   justify-content: center;
   align-items: center;
-}
+} */
 
 .hero-placeholder {
   font-size: 15rem;

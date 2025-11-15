@@ -6,6 +6,7 @@ import Header from "../Components/Header.jsx";
 import Card from "../Components/Card.jsx";
 import { Button } from "../Components/Button.jsx";
 import "./Pages.css";
+import { Pointer } from "lucide-react";
 const LoginPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -63,7 +64,10 @@ const LoginPage = () => {
           </form>
           <p className="auth-footer">
             Don't have an account?{" "}
-            <a href="#" onClick={() => navigate("/signup")}>
+            <a
+              onClick={() => navigate("/signup")}
+              style={{ color: "sky blue", cursor: "Pointer" }}
+            >
               Sign Up
             </a>
           </p>

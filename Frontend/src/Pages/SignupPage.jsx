@@ -96,7 +96,10 @@ const SignupPage = () => {
           </form>
           <p className="auth-footer">
             Already have an account?{" "}
-            <a href="#" onClick={() => navigate("/login")}>
+            <a
+              onClick={() => navigate("/login")}
+              style={{ color: "sky blue", cursor: "Pointer" }}
+            >
               Login
             </a>
           </p>
