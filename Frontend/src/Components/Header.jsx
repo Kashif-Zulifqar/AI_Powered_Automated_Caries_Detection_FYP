@@ -11,9 +11,7 @@ const Header = ({ isLanding = false }) => {
   return (
     <header className="header">
       <div className="header-container">
-        <div className="logo" onClick={() => navigate("/")}>
-          🦷 DentalAI
-        </div>
+        <div className="logo">🦷 DentalAI</div>
         <nav className="nav">
           {isLanding ? (
             <>
