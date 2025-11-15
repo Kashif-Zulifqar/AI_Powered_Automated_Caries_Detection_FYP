@@ -183,7 +183,11 @@ html {
    ============================================ */
 .auth-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #349cd4 100%);
+  background-image: url("/login2.jpg");
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  padding: 0;
 }
 
 .auth-container {
@@ -194,6 +198,9 @@ html {
 
 .auth-card {
   text-align: center;
+  padding: 2rem;
+  background: rgba(68, 190, 238, 0.9);
+  border-radius: 8px;
 }
 
 .auth-card h1 {
@@ -241,6 +248,10 @@ html {
 .dashboard-page {
   min-height: 100vh;
   background: skyblue;
+  background-image: url("/login2.jpg");
+  background-size: cover;
+  background-repeat: no-repeat;
+  /* background-attachment: fixed; */
 }
 
 .dashboard-container {
