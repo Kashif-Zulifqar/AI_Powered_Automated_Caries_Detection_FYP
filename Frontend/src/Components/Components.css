@@ -23,7 +23,7 @@ body {
    HEADER COMPONENT
    ============================================ */
 .header {
-  background: white;
+  background-color: rgba(245, 245, 245, 0.484);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   position: sticky;
   top: 0;
@@ -53,16 +53,18 @@ body {
 }
 
 .nav a {
-  color: #666;
+  color: rgba(24, 41, 169, 0.918);
   text-decoration: none;
   padding: 0.5rem 1rem;
   border-radius: 4px;
   transition: all 0.3s;
+  font-weight: bold;
 }
 
 .nav a:hover {
   color: #2196f3;
   background: #f0f7ff;
+  font-weight: bold;
 }
 
 .nav-link {
@@ -100,7 +102,8 @@ body {
 
 .btn-primary {
   background: #2196f3;
-  color: white;
+  color: rgba(247, 247, 248, 0.918);
+  font-weight: bold;
 }
 
 .btn-primary:hover {

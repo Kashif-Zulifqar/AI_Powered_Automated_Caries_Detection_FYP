@@ -15,7 +15,7 @@ const LandingPage = () => {
       {/* Hero Section */}
       <section className="hero">
         <div className="hero-content">
-          <h1>AI-Powered Dental Caries Detection</h1>
+          <h1>AI-Powered Automated Caries Detection</h1>
           <p className="hero-subtitle">
             Detect dental cavities with precision using advanced artificial
             intelligence. Fast, accurate, and reliable results for better oral
