@@ -183,13 +183,13 @@ html {
    ============================================ */
 .auth-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #667eea 0%, #349cd4 100%);
 }
 
 .auth-container {
   max-width: 500px;
   margin: 0 auto;
-  padding: 4rem 2rem;
+  padding: 2rem;
 }
 
 .auth-card {
@@ -240,7 +240,7 @@ html {
    ============================================ */
 .dashboard-page {
   min-height: 100vh;
-  background: #f5f7fa;
+  background: skyblue;
 }
 
 .dashboard-container {
@@ -390,7 +390,7 @@ html {
    ============================================ */
 .upload-page {
   min-height: 100vh;
-  background: #f5f7fa;
+  background: skyblue;
 }
 
 .upload-container {
@@ -715,7 +715,7 @@ html {
    ============================================ */
 .history-page {
   min-height: 100vh;
-  background: #f5f7fa;
+  background: skyblue;
 }
 
 .history-container {
@@ -961,7 +961,7 @@ html {
    ============================================ */
 .profile-page {
   min-height: 100vh;
-  background: #f5f7fa;
+  background: skyblue;
 }
 
 .profile-container {
