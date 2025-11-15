@@ -30,10 +30,10 @@ const AuthProvider = ({ children }) => {
 
   const login = (email, password) => {
     const mockUser = {
-      name: "Dr. Sarah Johnson",
+      name: "Kashif Ali",
       email: email,
-      age: 35,
-      gender: "Female",
+      age: 22,
+      gender: "Male",
     };
     localStorage.setItem("dentalUser", JSON.stringify(mockUser));
     setUser(mockUser);
