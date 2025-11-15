@@ -1,15 +1,21 @@
 /* ============================================
    LANDING PAGE
    ============================================ */
+body,
+html {
+  margin: 0;
+  padding: 0;
+}
 .landing-page {
-  background: white;
-  background-image: url("/E:\FYP_Dental_AI\Frontend\public\dental1.jpg");
-  /* background-image: url("/E:\FYP_Dental_AI\Frontend\public\image2.avif"); */
+  background-image: url("/dental1.jpg");
   background-size: cover;
   /* background-position: center; */
   background-repeat: no-repeat;
   min-height: 100vh;
   min-width: auto;
+  background-attachment: fixed;
+  padding: 0;
+  margin: auto;
 }
 
 .hero {
@@ -45,13 +51,13 @@
   align-items: center;
 } */
 
-.hero-placeholder {
+/* .hero-placeholder {
   font-size: 15rem;
-  opacity: 0.1;
-}
+  opacity: 0.9;
+} */
 
 .features {
-  background: #f5f7fa;
+  background: skyblue;
   padding: 4rem 2rem;
 }
 
@@ -87,8 +93,8 @@
 
 .how-it-works {
   padding: 4rem 2rem;
-  max-width: 1200px;
   margin: 0 auto;
+  background: skyblue;
 }
 
 .how-it-works h2 {
@@ -134,7 +140,7 @@
 }
 
 .testimonials {
-  background: #f5f7fa;
+  background: skyblue;
   padding: 4rem 2rem;
 }
 
