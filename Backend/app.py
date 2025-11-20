@@ -6,7 +6,7 @@ CORS(app)
 
 @app.route('/test')
 def test():
-    return jsonify({"message": "Flask backend is running successfully!"})
+    return jsonify({"message": "Hurrah! Flask backend is running successfully!"})
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
