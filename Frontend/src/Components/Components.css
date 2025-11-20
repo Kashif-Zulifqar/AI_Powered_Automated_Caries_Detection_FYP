@@ -102,9 +102,9 @@ body {
   bottom: 0;
   left: 50%;
   transform: translateX(-50%);
-  width: 0; /* Initially hidden */
+  width: 0; 
   height: 2px;
-  background-color: #2196f3;
+  background-color: #d1d8de;
   transition: width 0.3s ease;
 }
 
@@ -114,11 +114,11 @@ body {
 }
 
 .nav-link:hover::after {
-  width: 100%; /* Expands the underline across the full width */
+  width: 100%; 
 }
 
 .nav-link.active::after {
-  width: 100%; /* Keeps the underline expanded when active */
+  width: 100%; 
 }
 /* ============================================
    BUTTON COMPONENT
