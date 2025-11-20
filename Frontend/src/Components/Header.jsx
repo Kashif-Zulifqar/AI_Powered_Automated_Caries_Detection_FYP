@@ -4,6 +4,8 @@
   import { useAuth } from "../Contexts/AuthContext";
   import { LogOut } from "lucide-react";
   import Button from "./Button.jsx";
+  import LoginPage from "../Pages/LoginPage.jsx";
+  import SignupPage from "../Pages/SignupPage.jsx";
 
   const Header = ({ isLanding = false }) => {
     const { isAuthenticated, logout } = useAuth();
