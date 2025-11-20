@@ -66,7 +66,7 @@ const LoginPage = () => {
             Don't have an account?{" "}
             <a
               onClick={() => navigate("/signup")}
-              style={{ color: "sky blue", cursor: "Pointer" }}
+              style={{ color: "Black", cursor: "Pointer" }}
             >
               Sign Up
             </a>

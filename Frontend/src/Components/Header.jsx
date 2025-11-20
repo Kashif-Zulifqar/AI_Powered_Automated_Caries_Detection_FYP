@@ -1,12 +1,14 @@
+import React from "react";
+import { useNavigate, useLocation } from "react-router-dom"; 
 import "./Components.css";
 import { useAuth } from "../Contexts/AuthContext";
-import { useNavigate } from "../App.jsx";
 import { LogOut } from "lucide-react";
 import Button from "./Button.jsx";
-// import { Button } from "./UI/Button.jsx";
+
 const Header = ({ isLanding = false }) => {
   const { isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   return (
     <header className="header">

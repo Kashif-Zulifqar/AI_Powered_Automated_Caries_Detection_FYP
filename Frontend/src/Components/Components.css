@@ -59,12 +59,29 @@ body {
   border-radius: 4px;
   transition: all 0.3s;
   font-weight: bold;
+  position: relative;
+}
+
+.nav a::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0; 
+  height: 2px;
+  background-color: #2196f3;
+  transition: width 0.3s ease;
 }
 
 .nav a:hover {
   color: #2196f3;
   background: #f0f7ff;
   font-weight: bold;
+}
+
+.nav a:hover::after {
+  width: calc(100% - 2rem); 
 }
 
 .nav-link {
@@ -76,6 +93,19 @@ body {
   font-size: 1rem;
   border-radius: 4px;
   transition: all 0.3s;
+  position: relative;
+}
+
+.nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0; /* Initially hidden */
+  height: 2px;
+  background-color: #2196f3;
+  transition: width 0.3s ease;
 }
 
 .nav-link:hover {
@@ -83,6 +113,13 @@ body {
   background: #f0f7ff;
 }
 
+.nav-link:hover::after {
+  width: 100%; /* Expands the underline across the full width */
+}
+
+.nav-link.active::after {
+  width: 100%; /* Keeps the underline expanded when active */
+}
 /* ============================================
    BUTTON COMPONENT
    ============================================ */
