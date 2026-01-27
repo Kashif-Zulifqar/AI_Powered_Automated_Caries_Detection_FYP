@@ -25,24 +25,20 @@ dist-ssr
 
 # Python
 __pycache__/
-*.py[cod]
+*.pyc
 *.pyo
 *.pyd
-*.pdb
 
 # Virtual environment
 venv/
 .env/
-.env*/
 
-# Flask / config
+# Flask
 instance/
-*.db
-*.sqlite3
 
-# IDE files
-.vscode/
-.idea/
+# OS
+.DS_Store
+Thumbs.db
 
-# Logs
-*.log
+# Node
+node_modules/
