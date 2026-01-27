@@ -13,6 +13,7 @@ auth = Blueprint("auth", __name__, url_prefix="/auth")
 # -----------------------------------------------------
 # 1️⃣ Register Start - name + email -> send OTP
 # -----------------------------------------------------
+
 @auth.post("/register-start")
 def register_start():
     data = request.get_json(force=True, silent=True) or {}
