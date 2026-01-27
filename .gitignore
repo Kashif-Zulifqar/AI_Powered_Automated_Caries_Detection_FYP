@@ -42,3 +42,7 @@ Thumbs.db
 
 # Node
 node_modules/
+# Ignore virtual environment
+venv/
+__pycache__/
+
