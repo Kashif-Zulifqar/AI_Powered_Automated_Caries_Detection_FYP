@@ -38,13 +38,16 @@ def send_email(to_email: str, subject: str, html: str):
     Expects `SMTP_USER` and `SMTP_PASS` to be set in the environment.
     Works with Brevo's `smtp-relay.brevo.com` (port 587) when credentials are provided.
     """
-    if not SMTP_USER or not SMTP_PASS:
-        raise Exception("Missing SMTP credentials (SMTP_USER / SMTP_PASS) in environment")
-
     msg = MIMEText(html, "html")
     msg["From"] = _format_from(SMTP_FROM)
     msg["To"] = to_email
     msg["Subject"] = subject
+
+    # If credentials are missing, don't crash — return False so callers can
+    # decide how to proceed (useful for local development / tests).
+    if not SMTP_USER or not SMTP_PASS:
+        print("send_email: SMTP credentials missing — skipping send (dev fallback)")
+        return False
 
     try:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as server:
@@ -54,9 +57,10 @@ def send_email(to_email: str, subject: str, html: str):
             server.login(SMTP_USER, SMTP_PASS)
             server.send_message(msg)
             print(f"Email successfully sent to {to_email}")
+            return True
     except smtplib.SMTPAuthenticationError as e:
         print(f"SMTP authentication error: {e}")
-        raise Exception("SMTP authentication failed — check SMTP_USER and SMTP_PASS")
+        return False
     except Exception as e:
         print(f"Email sending failed: {e}")
-        raise
+        return False
