@@ -183,9 +183,9 @@ def forgot_start():
 
     try:
         send_email(email, "IADS Password Reset OTP", html)
-        print(f"✅ Password reset OTP sent to {email}")
+        print(f"Password reset OTP sent to {email}")
     except Exception as e:
-        print(f"❌ Email send failed: {e}")
+        print(f"Email send failed: {e}")
         return jsonify({"error": f"Failed to send OTP: {e}"}), 500
 
     return jsonify({"message": "OTP sent to your email"}), 200
