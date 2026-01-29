@@ -32,7 +32,7 @@ def create_app():
     # Health check
     @app.get("/")
     def root():
-        return jsonify({"message": "IADS Flask Backend Running ✅"})
+        return jsonify({"message": "IADS Flask Backend Running"})
 
     # Register blueprints
     app.register_blueprint(auth)
