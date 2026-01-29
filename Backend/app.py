@@ -1,15 +1,3 @@
-from flask import Flask, jsonify
-from flask_cors import CORS
-
-app = Flask(__name__)
-CORS(app)
-
-@app.route('/test')
-def test():
-    return jsonify({"message": "Hurrah! Flask backend is running successfully!"})
-
-if __name__ == "__main__":
-    app.run(debug=True, port=5000)
 import os
 from flask import Flask, jsonify
 from flask_cors import CORS
@@ -40,7 +28,5 @@ def create_app():
     return app
 
 if __name__ == "__main__":
-    from flask_cors import CORS
-    app = create_app()  # or however you're creating your app
-    CORS(app)
-    app.run(debug=True, use_reloader=False)
+    app = create_app()
+    app.run(debug=True, port=5000)
