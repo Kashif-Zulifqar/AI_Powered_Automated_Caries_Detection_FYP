@@ -7,6 +7,7 @@ from utils import (
     make_reset_token, read_reset_token
 )
 from emailer import send_email
+import os
 
 auth = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -57,6 +58,13 @@ def register_start():
         send_email(email, "Your IADS verification code", html)
     except Exception as e:
         return jsonify({"error": f"Failed to send OTP email: {e}"}), 500
+
+    # Optionally print OTP in development when DEV_MODE=true
+    try:
+        if os.getenv("DEV_MODE", "false").lower() == "true":
+            print(f"DEV REGISTER OTP for {email}: {otp}")
+    except Exception:
+        pass
 
     return jsonify({"message": "OTP sent to your email"}), 200
 
@@ -183,10 +191,16 @@ def forgot_start():
 
     try:
         send_email(email, "IADS Password Reset OTP", html)
-        print(f"Password reset OTP sent to {email}")
     except Exception as e:
         print(f"Email send failed: {e}")
         return jsonify({"error": f"Failed to send OTP: {e}"}), 500
+
+    # Optionally print OTP in development when DEV_MODE=true
+    try:
+        if os.getenv("DEV_MODE", "false").lower() == "true":
+            print(f"DEV FORGOT OTP for {email}: {otp}")
+    except Exception:
+        pass
 
     return jsonify({"message": "OTP sent to your email"}), 200
 
