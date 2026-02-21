@@ -19,6 +19,7 @@ const AuthContext = createContext();
 const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
 
   useEffect(() => {
     const storedUser = localStorage.getItem("dentalUser");
@@ -28,29 +29,114 @@ const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const login = (email, password) => {
-    const mockUser = {
-      name: "Kashif Ali",
-      email: email,
-      age: 22,
-      gender: "Male",
-    };
-    localStorage.setItem("dentalUser", JSON.stringify(mockUser));
-    setUser(mockUser);
-    setIsAuthenticated(true);
-    return true;
+  // On mount, try to fetch current user if token present
+  useEffect(() => {
+    const token = localStorage.getItem("dentalToken");
+    if (token) {
+      fetch(`${API_BASE}/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (!data.error) {
+            setUser(data);
+            setIsAuthenticated(true);
+            localStorage.setItem("dentalUser", JSON.stringify(data));
+          } else {
+            localStorage.removeItem("dentalToken");
+            localStorage.removeItem("dentalUser");
+          }
+        })
+        .catch(() => {
+          localStorage.removeItem("dentalToken");
+          localStorage.removeItem("dentalUser");
+        });
+    }
+  }, []);
+
+  const login = async (email, password) => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (res.ok && data.token) {
+        localStorage.setItem("dentalToken", data.token);
+        const userObj = { email, name: data.name };
+        localStorage.setItem("dentalUser", JSON.stringify(userObj));
+        setUser(userObj);
+        setIsAuthenticated(true);
+        return { ok: true };
+      }
+      return { ok: false, error: data.error || "Login failed" };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
   };
 
-  const signup = (name, email, password) => {
-    const newUser = { name, email, age: null, gender: null };
-    localStorage.setItem("dentalUser", JSON.stringify(newUser));
-    setUser(newUser);
-    setIsAuthenticated(true);
-    return true;
+  // Start signup: call register-start, then store pending data in sessionStorage
+  const signup = async (name, email, password) => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/register-start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        // store pending signup details for confirmation step
+        sessionStorage.setItem(
+          "signupPending",
+          JSON.stringify({ name, email, password }),
+        );
+        // If backend returned OTP in dev-mode, also store it for confirmation prefilling
+        if (data.dev && data.otp) {
+          sessionStorage.setItem("signupOtp", data.otp);
+        }
+        return { ok: true, data };
+      }
+      return { ok: false, error: data.error || "Signup failed", data };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  };
+
+  // Complete signup using OTP
+  const completeSignup = async (otp) => {
+    const pending = sessionStorage.getItem("signupPending");
+    if (!pending) return { ok: false, error: "No pending signup found" };
+    const { email, password } = JSON.parse(pending);
+    try {
+      const res = await fetch(`${API_BASE}/auth/register-complete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          otp,
+          password,
+          confirmPassword: password,
+        }),
+      });
+      const data = await res.json();
+      if (res.status === 201) {
+        // auto-login after successful registration
+        sessionStorage.removeItem("signupPending");
+        const loginRes = await login(email, password);
+        return loginRes.ok
+          ? { ok: true }
+          : { ok: false, error: "Registration succeeded but login failed" };
+      }
+      return { ok: false, error: data.error || "Registration failed" };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
   };
 
   const logout = () => {
     localStorage.removeItem("dentalUser");
+    localStorage.removeItem("dentalToken");
     setUser(null);
     setIsAuthenticated(false);
   };
@@ -63,7 +149,15 @@ const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider
-      value={{ user, isAuthenticated, login, signup, logout, updateProfile }}
+      value={{
+        user,
+        isAuthenticated,
+        login,
+        signup,
+        completeSignup,
+        logout,
+        updateProfile,
+      }}
     >
       {children}
     </AuthContext.Provider>

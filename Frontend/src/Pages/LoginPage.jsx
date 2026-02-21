@@ -16,13 +16,19 @@ const LoginPage = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (email && password) {
-      login(email, password);
-      addToast("Login successful!", "success");
-      navigate("/dashboard");
-    } else {
-      addToast("Please fill in all fields", "error");
-    }
+    (async () => {
+      if (email && password) {
+        const res = await login(email, password);
+        if (res.ok) {
+          addToast("Login successful!", "success");
+          navigate("/dashboard");
+        } else {
+          addToast(res.error || "Login failed", "error");
+        }
+      } else {
+        addToast("Please fill in all fields", "error");
+      }
+    })();
   };
 
   return (
