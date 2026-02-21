@@ -28,9 +28,35 @@ const SignupPage = () => {
       return;
     }
     if (formData.name && formData.email && formData.password) {
-      signup(formData.name, formData.email, formData.password);
-      addToast("Account created successfully!", "success");
-      navigate("/dashboard");
+      // start register (sends OTP) then navigate to confirmation
+      (async () => {
+        const res = await signup(
+          formData.name,
+          formData.email,
+          formData.password,
+        );
+        if (res.ok) {
+          const backend = res.data || {};
+          if (backend.dev && backend.otp) {
+            addToast(
+              `DEV OTP: ${backend.otp} (use this to complete signup)`,
+              "success",
+            );
+            // also store OTP for prefill on confirm page
+            sessionStorage.setItem("signupOtp", backend.otp);
+          } else {
+            addToast(
+              "OTP sent to your email — enter it to complete signup",
+              "success",
+            );
+          }
+          navigate("/signup/confirm");
+        } else {
+          const err =
+            res.error || (res.data && res.data.error) || "Signup failed";
+          addToast(err, "error");
+        }
+      })();
     } else {
       addToast("Please fill in all fields", "error");
     }

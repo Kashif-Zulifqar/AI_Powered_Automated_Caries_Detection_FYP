@@ -4,6 +4,7 @@ import { ToastProvider } from "./Contexts/ToastContext";
 import LandingPage from "./Pages/LandingPage";
 import LoginPage from "./Pages/LoginPage";
 import SignupPage from "./Pages/SignupPage";
+import SignupConfirmPage from "./Pages/SignupConfirmPage";
 import DashboardPage from "./Pages/Dashboard";
 import UploadPage from "./Pages/UploadPage";
 import ResultsPage from "./Pages/ResultsPage";
@@ -27,7 +28,7 @@ export const useParams = () => {
 // Router Component
 const Router = () => {
   const [currentPath, setCurrentPath] = useState(
-    window.location.hash.slice(1) || "/"
+    window.location.hash.slice(1) || "/",
   );
 
   useEffect(() => {
@@ -55,6 +56,8 @@ const Routes = () => {
     return <LoginPage />;
   } else if (currentPath === "/signup") {
     return <SignupPage />;
+  } else if (currentPath === "/signup/confirm") {
+    return <SignupConfirmPage />;
   } else if (currentPath === "/dashboard") {
     return isAuthenticated ? <DashboardPage /> : <LoginPage />;
   } else if (currentPath === "/upload") {

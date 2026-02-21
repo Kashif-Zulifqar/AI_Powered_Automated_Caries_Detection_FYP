@@ -54,19 +54,35 @@ def register_start():
     </div>
     """
 
+    # Try to send the email; `send_email` returns True on success, False otherwise
     try:
-        send_email(email, "Your IADS verification code", html)
+        sent = send_email(email, "Your IADS verification code", html)
     except Exception as e:
+        # If send_email raises, return error (likely unexpected)
         return jsonify({"error": f"Failed to send OTP email: {e}"}), 500
 
-    # Optionally print OTP in development when DEV_MODE=true
+    # Auto-enable dev-mode if SMTP credentials are missing so we don't fail
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_pass = os.getenv("SMTP_PASS")
+    auto_dev = not smtp_user or not smtp_pass
+    dev_mode = os.getenv("DEV_MODE", "false").lower() == "true" or auto_dev
+
+    # If send failed but SMTP creds are missing, treat it as dev and print/return OTP
+    if not sent and not auto_dev and not dev_mode:
+        return jsonify({"error": "Failed to send OTP email (SMTP not configured)"}), 500
+
+    # In dev mode print and (optionally) include OTP in response for easy testing
     try:
-        if os.getenv("DEV_MODE", "false").lower() == "true":
+        if dev_mode:
             print(f"DEV REGISTER OTP for {email}: {otp}")
     except Exception:
         pass
 
-    return jsonify({"message": "OTP sent to your email"}), 200
+    resp = {"message": "OTP sent to your email"}
+    if dev_mode:
+        resp["dev"] = True
+        resp["otp"] = otp
+    return jsonify(resp), 200
 
 
 # -----------------------------------------------------
@@ -190,19 +206,30 @@ def forgot_start():
     """
 
     try:
-        send_email(email, "IADS Password Reset OTP", html)
+        sent = send_email(email, "IADS Password Reset OTP", html)
     except Exception as e:
         print(f"Email send failed: {e}")
         return jsonify({"error": f"Failed to send OTP: {e}"}), 500
 
-    # Optionally print OTP in development when DEV_MODE=true
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_pass = os.getenv("SMTP_PASS")
+    auto_dev = not smtp_user or not smtp_pass
+    dev_mode = os.getenv("DEV_MODE", "false").lower() == "true" or auto_dev
+
+    if not sent and not auto_dev and not dev_mode:
+        return jsonify({"error": "Failed to send OTP email (SMTP not configured)"}), 500
+
     try:
-        if os.getenv("DEV_MODE", "false").lower() == "true":
+        if dev_mode:
             print(f"DEV FORGOT OTP for {email}: {otp}")
     except Exception:
         pass
 
-    return jsonify({"message": "OTP sent to your email"}), 200
+    resp = {"message": "OTP sent to your email"}
+    if dev_mode:
+        resp["dev"] = True
+        resp["otp"] = otp
+    return jsonify(resp), 200
 
 
 # -----------------------------------------------------
@@ -257,3 +284,31 @@ def forgot_reset():
     )
 
     return jsonify({"message": "Password updated successfully"}), 200
+
+
+# -----------------------------------------------------
+# Test email endpoint (useful to validate SMTP config)
+# -----------------------------------------------------
+@auth.post("/test-email")
+def test_email():
+    data = request.get_json(force=True, silent=True) or {}
+    to_email = (data.get("email") or "").strip()
+    subject = data.get("subject") or "IADS Test Email"
+    body = data.get("html") or "<p>This is a test email from IADS backend.</p>"
+
+    if not to_email:
+        return jsonify({"error": "Email is required"}), 400
+
+    try:
+        sent = send_email(to_email, subject, body)
+    except Exception as e:
+        return jsonify({"error": f"Exception while sending email: {e}"}), 500
+
+    if sent:
+        return jsonify({"message": "Test email sent"}), 200
+    else:
+        # Give actionable guidance when send_email returned False
+        return jsonify({
+            "error": "SMTP appears unconfigured or send failed. Set SMTP_USER and SMTP_PASS in your environment or enable DEV_MODE for local testing.",
+            "dev": (os.getenv("DEV_MODE", "false").lower() == "true")
+        }), 500
