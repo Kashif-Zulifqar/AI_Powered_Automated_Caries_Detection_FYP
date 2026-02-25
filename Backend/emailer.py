@@ -43,24 +43,37 @@ def send_email(to_email: str, subject: str, html: str):
     msg["To"] = to_email
     msg["Subject"] = subject
 
-    # If credentials are missing, don't crash — return False so callers can
-    # decide how to proceed (useful for local development / tests).
+    # Attempt to send via configured SMTP server. If username/password are
+    # provided we'll authenticate; otherwise we'll attempt to send without
+    # authentication (useful for local SMTP relays like MailHog/Mailtrap or
+    # corporate relays that allow unauthenticated deliveries from trusted hosts).
     if not SMTP_USER or not SMTP_PASS:
-        print("send_email: SMTP credentials missing — skipping send (dev fallback)")
-        return False
+        print("send_email: SMTP credentials not provided — attempting unauthenticated send")
 
     try:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as server:
             server.ehlo()
-            server.starttls()
-            server.ehlo()
-            server.login(SMTP_USER, SMTP_PASS)
+            # Try to secure the connection; if TLS isn't available continue.
+            try:
+                server.starttls()
+                server.ehlo()
+            except Exception as e:
+                print(f"starttls not used: {e}")
+
+            # If creds provided, attempt login; otherwise proceed without auth.
+            if SMTP_USER and SMTP_PASS:
+                try:
+                    server.login(SMTP_USER, SMTP_PASS)
+                except smtplib.SMTPAuthenticationError as e:
+                    print(f"SMTP authentication error: {e}")
+                    return False
+                except Exception as e:
+                    print(f"SMTP login failed: {e}")
+                    return False
+
             server.send_message(msg)
             print(f"Email successfully sent to {to_email}")
             return True
-    except smtplib.SMTPAuthenticationError as e:
-        print(f"SMTP authentication error: {e}")
-        return False
     except Exception as e:
         print(f"Email sending failed: {e}")
         return False

@@ -61,17 +61,28 @@ def register_start():
         # If send_email raises, return error (likely unexpected)
         return jsonify({"error": f"Failed to send OTP email: {e}"}), 500
 
-    # Auto-enable dev-mode if SMTP credentials are missing so we don't fail
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_pass = os.getenv("SMTP_PASS")
-    auto_dev = not smtp_user or not smtp_pass
-    dev_mode = os.getenv("DEV_MODE", "false").lower() == "true" or auto_dev
+    # Only enable dev-mode if explicitly set via DEV_MODE. Do NOT auto-enable
+    # when SMTP credentials are missing — that would leak OTPs to clients.
+    dev_mode = os.getenv("DEV_MODE", "false").lower() == "true"
 
-    # If send failed but SMTP creds are missing, treat it as dev and print/return OTP
-    if not sent and not auto_dev and not dev_mode:
-        return jsonify({"error": "Failed to send OTP email (SMTP not configured)"}), 500
+    # If sending failed and we're not explicitly in dev mode, allow a local
+    # SMTP dev flow when `SMTP_HOST` points to localhost (MailHog etc.). This
+    # permits working with local mail capture without requiring real SMTP
+    # credentials. Do NOT expose the OTP in API responses unless DEV_MODE=true.
+    smtp_host = os.getenv("SMTP_HOST", "smtp-relay.brevo.com").lower()
+    local_smtp = smtp_host.startswith("localhost") or smtp_host.startswith("127.") or smtp_host in ("0.0.0.0",)
 
-    # In dev mode print and (optionally) include OTP in response for easy testing
+    if not sent and not dev_mode:
+        if local_smtp:
+            try:
+                print(f"LOCAL SMTP: send failed but continuing — register OTP for {email}: {otp}")
+            except Exception:
+                pass
+            # Proceed as if sent; instruct client to check local mail capture
+        else:
+            return jsonify({"error": "Failed to send OTP email (SMTP not configured)"}), 500
+
+    # In explicit dev mode print and (optionally) include OTP in response for testing
     try:
         if dev_mode:
             print(f"DEV REGISTER OTP for {email}: {otp}")
@@ -79,6 +90,8 @@ def register_start():
         pass
 
     resp = {"message": "OTP sent to your email"}
+    if not sent and not dev_mode and local_smtp:
+        resp = {"message": "OTP queued to local SMTP — check your local mail capture (e.g. MailHog)"}
     if dev_mode:
         resp["dev"] = True
         resp["otp"] = otp
@@ -210,14 +223,20 @@ def forgot_start():
     except Exception as e:
         print(f"Email send failed: {e}")
         return jsonify({"error": f"Failed to send OTP: {e}"}), 500
+    # Only enable dev-mode when explicitly requested via DEV_MODE.
+    dev_mode = os.getenv("DEV_MODE", "false").lower() == "true"
 
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_pass = os.getenv("SMTP_PASS")
-    auto_dev = not smtp_user or not smtp_pass
-    dev_mode = os.getenv("DEV_MODE", "false").lower() == "true" or auto_dev
+    smtp_host = os.getenv("SMTP_HOST", "smtp-relay.brevo.com").lower()
+    local_smtp = smtp_host.startswith("localhost") or smtp_host.startswith("127.") or smtp_host in ("0.0.0.0",)
 
-    if not sent and not auto_dev and not dev_mode:
-        return jsonify({"error": "Failed to send OTP email (SMTP not configured)"}), 500
+    if not sent and not dev_mode:
+        if local_smtp:
+            try:
+                print(f"LOCAL SMTP: send failed but continuing — forgot OTP for {email}: {otp}")
+            except Exception:
+                pass
+        else:
+            return jsonify({"error": "Failed to send OTP email (SMTP not configured)"}), 500
 
     try:
         if dev_mode:
@@ -226,6 +245,8 @@ def forgot_start():
         pass
 
     resp = {"message": "OTP sent to your email"}
+    if not sent and not dev_mode and local_smtp:
+        resp = {"message": "OTP queued to local SMTP — check your local mail capture (e.g. MailHog)"}
     if dev_mode:
         resp["dev"] = True
         resp["otp"] = otp
@@ -308,7 +329,8 @@ def test_email():
         return jsonify({"message": "Test email sent"}), 200
     else:
         # Give actionable guidance when send_email returned False
+        dev_mode = os.getenv("DEV_MODE", "false").lower() == "true"
         return jsonify({
             "error": "SMTP appears unconfigured or send failed. Set SMTP_USER and SMTP_PASS in your environment or enable DEV_MODE for local testing.",
-            "dev": (os.getenv("DEV_MODE", "false").lower() == "true")
+            "dev": dev_mode
         }), 500

@@ -16,6 +16,7 @@ const SignupPage = () => {
   const { signup } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -30,11 +31,13 @@ const SignupPage = () => {
     if (formData.name && formData.email && formData.password) {
       // start register (sends OTP) then navigate to confirmation
       (async () => {
+        setLoading(true);
         const res = await signup(
           formData.name,
           formData.email,
           formData.password,
         );
+        setLoading(false);
         if (res.ok) {
           const backend = res.data || {};
           if (backend.dev && backend.otp) {
@@ -42,7 +45,6 @@ const SignupPage = () => {
               `DEV OTP: ${backend.otp} (use this to complete signup)`,
               "success",
             );
-            // also store OTP for prefill on confirm page
             sessionStorage.setItem("signupOtp", backend.otp);
           } else {
             addToast(
@@ -50,7 +52,7 @@ const SignupPage = () => {
               "success",
             );
           }
-          navigate("/signup/confirm");
+          setTimeout(() => navigate("/signup/confirm"), 180);
         } else {
           const err =
             res.error || (res.data && res.data.error) || "Signup failed";
@@ -116,7 +118,7 @@ const SignupPage = () => {
                 required
               />
             </div>
-            <Button type="submit" className="auth-button">
+            <Button type="submit" className="auth-button" loading={loading}>
               Sign Up
             </Button>
           </form>

@@ -13,15 +13,19 @@ const LoginPage = () => {
   const { login } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     (async () => {
       if (email && password) {
+        setLoading(true);
         const res = await login(email, password);
+        setLoading(false);
         if (res.ok) {
           addToast("Login successful!", "success");
-          navigate("/dashboard");
+          // small delay for UX transition
+          setTimeout(() => navigate("/dashboard"), 180);
         } else {
           addToast(res.error || "Login failed", "error");
         }
@@ -64,7 +68,7 @@ const LoginPage = () => {
             <a href="#" className="forgot-password">
               Forgot Password?
             </a>
-            <Button type="submit" className="auth-button">
+            <Button type="submit" className="auth-button" loading={loading}>
               Login
             </Button>
           </form>
