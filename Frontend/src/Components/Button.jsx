@@ -1,5 +1,7 @@
 import React from "react";
 import "./Components.css";
+import Spinner from "./Spinner.jsx";
+
 const Button = ({
   children,
   variant = "primary",
@@ -7,15 +9,16 @@ const Button = ({
   type = "button",
   disabled = false,
   className = "",
+  loading = false,
 }) => {
   return (
     <button
       type={type}
       className={`btn btn-${variant} ${className}`}
       onClick={onClick}
-      disabled={disabled}
+      disabled={disabled || loading}
     >
-      {children}
+      {loading ? <Spinner size={16} /> : children}
     </button>
   );
 };

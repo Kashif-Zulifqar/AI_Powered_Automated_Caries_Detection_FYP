@@ -7,6 +7,7 @@ import Button from "../Components/Button.jsx";
 import "./Pages.css";
 const LandingPage = () => {
   const navigate = useNavigate();
+  const [navigating, setNavigating] = React.useState(false);
 
   return (
     <div className="landing-page">
@@ -22,10 +23,23 @@ const LandingPage = () => {
             health.
           </p>
           <div className="hero-buttons">
-            <Button onClick={() => navigate("/signup")}>
+            <Button
+              onClick={() => {
+                setNavigating(true);
+                setTimeout(() => navigate("/signup"), 180);
+              }}
+              className={navigating ? "page-fade exiting" : "page-fade"}
+            >
               Get Started Free
             </Button>
-            <Button variant="outline" onClick={() => navigate("/login")}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setNavigating(true);
+                setTimeout(() => navigate("/login"), 180);
+              }}
+              className={navigating ? "page-fade exiting" : "page-fade"}
+            >
               Login
             </Button>
           </div>

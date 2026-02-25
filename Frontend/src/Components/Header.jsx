@@ -1,17 +1,26 @@
 import "./Components.css";
 import { useAuth } from "../Contexts/AuthContext";
+import { useToast } from "../Contexts/ToastContext";
 import { useNavigate } from "../App.jsx";
 import { LogOut } from "lucide-react";
 import Button from "./Button.jsx";
 // import { Button } from "./UI/Button.jsx";
 const Header = ({ isLanding = false }) => {
   const { isAuthenticated, logout } = useAuth();
+  const { addToast } = useToast();
   const navigate = useNavigate();
 
   return (
     <header className="header">
       <div className="header-container">
-        <div className="logo">🦷 DentalAI</div>
+        <div
+          className="logo"
+          role="button"
+          onClick={() => navigate(isAuthenticated ? "/dashboard" : "/")}
+          style={{ cursor: "pointer" }}
+        >
+          🦷 DentalAI
+        </div>
         <nav className="nav">
           {isLanding ? (
             <>
@@ -43,8 +52,14 @@ const Header = ({ isLanding = false }) => {
               <Button
                 variant="outline"
                 onClick={() => {
-                  logout();
-                  navigate("/");
+                  const ok = window.confirm(
+                    "Are you sure you want to log out?",
+                  );
+                  if (ok) {
+                    logout();
+                    addToast("Logged out", "info");
+                    navigate("/");
+                  }
                 }}
               >
                 <LogOut size={18} /> Logout
