@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 import bcrypt
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
-load_dotenv()
+load_dotenv(override=True)
 
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret")
 serializer = URLSafeTimedSerializer(SECRET_KEY)

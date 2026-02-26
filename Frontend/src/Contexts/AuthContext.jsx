@@ -134,6 +134,28 @@ const AuthProvider = ({ children }) => {
     }
   };
 
+  // Resend OTP for pending signup – re-calls register-start with stored details
+  const resendSignupOtp = async () => {
+    const pending = sessionStorage.getItem("signupPending");
+    if (!pending) return { ok: false, error: "No pending signup session" };
+    const { name, email } = JSON.parse(pending);
+    try {
+      const res = await fetch(`${API_BASE}/auth/register-start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (data.dev && data.otp) sessionStorage.setItem("signupOtp", data.otp);
+        return { ok: true, data };
+      }
+      return { ok: false, error: data.error || "Resend failed" };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem("dentalUser");
     localStorage.removeItem("dentalToken");
@@ -155,6 +177,7 @@ const AuthProvider = ({ children }) => {
         login,
         signup,
         completeSignup,
+        resendSignupOtp,
         logout,
         updateProfile,
       }}

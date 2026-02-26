@@ -4,7 +4,7 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 from auth import auth
 
-load_dotenv()
+load_dotenv(override=True)
 
 def create_app():
     app = Flask(__name__)

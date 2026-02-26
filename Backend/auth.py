@@ -6,7 +6,7 @@ from utils import (
     now_utc, plus_minutes,
     make_reset_token, read_reset_token
 )
-from emailer import send_email
+from emailer import send_email, get_last_email_error
 import os
 
 auth = Blueprint("auth", __name__, url_prefix="/auth")
@@ -80,7 +80,11 @@ def register_start():
                 pass
             # Proceed as if sent; instruct client to check local mail capture
         else:
-            return jsonify({"error": "Failed to send OTP email (SMTP not configured)"}), 500
+            detail = get_last_email_error()
+            return jsonify({
+                "error": "Failed to send OTP email",
+                "detail": detail
+            }), 500
 
     # In explicit dev mode print and (optionally) include OTP in response for testing
     try:
@@ -236,7 +240,11 @@ def forgot_start():
             except Exception:
                 pass
         else:
-            return jsonify({"error": "Failed to send OTP email (SMTP not configured)"}), 500
+            detail = get_last_email_error()
+            return jsonify({
+                "error": "Failed to send OTP email",
+                "detail": detail
+            }), 500
 
     try:
         if dev_mode:
