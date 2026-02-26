@@ -10,13 +10,18 @@ const Header = ({ isLanding = false }) => {
   const { addToast } = useToast();
   const navigate = useNavigate();
 
+  const handleLogoClick = () => {
+    // Always send the user to the public home/landing page
+    navigate("/");
+  };
+
   return (
     <header className="header">
       <div className="header-container">
         <div
           className="logo"
           role="button"
-          onClick={() => navigate(isAuthenticated ? "/dashboard" : "/")}
+          onClick={handleLogoClick}
           style={{ cursor: "pointer" }}
         >
           🦷 DentalAI

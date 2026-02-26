@@ -6,6 +6,29 @@ import Header from "../Components/Header.jsx";
 import Card from "../Components/Card.jsx";
 import { Button } from "../Components/Button.jsx";
 import "./Pages.css";
+
+// Common email domain typos -> correct mapping
+const EMAIL_TYPOS = {
+  "gamil.com": "gmail.com",
+  "gmai.com": "gmail.com",
+  "gmial.com": "gmail.com",
+  "gmal.com": "gmail.com",
+  "gmail.co": "gmail.com",
+  "hotmial.com": "hotmail.com",
+  "hotmal.com": "hotmail.com",
+  "hotmai.com": "hotmail.com",
+  "yahooo.com": "yahoo.com",
+  "yaho.com": "yahoo.com",
+  "outlok.com": "outlook.com",
+  "outloo.com": "outlook.com",
+};
+
+const checkEmailTypo = (email) => {
+  const domain = email.split("@")[1]?.toLowerCase();
+  if (!domain) return null;
+  return EMAIL_TYPOS[domain] || null;
+};
+
 const SignupPage = () => {
   const [formData, setFormData] = useState({
     name: "",
@@ -13,13 +36,32 @@ const SignupPage = () => {
     password: "",
     confirmPassword: "",
   });
+  const [emailWarning, setEmailWarning] = useState(null);
   const { signup } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+    if (name === "email") {
+      const suggestion = checkEmailTypo(value);
+      setEmailWarning(
+        suggestion
+          ? `Did you mean ${value.split("@")[0]}@${suggestion}?`
+          : null,
+      );
+    }
+  };
+
+  const handleFixEmail = () => {
+    if (!emailWarning) return;
+    const local = formData.email.split("@")[0];
+    const suggested = emailWarning.split("@")[1].replace("?", "");
+    const fixed = `${local}@${suggested}`;
+    setFormData({ ...formData, email: fixed });
+    setEmailWarning(null);
   };
 
   const handleSubmit = (e) => {
@@ -28,40 +70,43 @@ const SignupPage = () => {
       addToast("Passwords do not match", "error");
       return;
     }
-    if (formData.name && formData.email && formData.password) {
-      // start register (sends OTP) then navigate to confirmation
-      (async () => {
-        setLoading(true);
-        const res = await signup(
-          formData.name,
-          formData.email,
-          formData.password,
-        );
-        setLoading(false);
-        if (res.ok) {
-          const backend = res.data || {};
-          if (backend.dev && backend.otp) {
-            addToast(
-              `DEV OTP: ${backend.otp} (use this to complete signup)`,
-              "success",
-            );
-            sessionStorage.setItem("signupOtp", backend.otp);
-          } else {
-            addToast(
-              "OTP sent to your email — enter it to complete signup",
-              "success",
-            );
-          }
-          setTimeout(() => navigate("/signup/confirm"), 180);
-        } else {
-          const err =
-            res.error || (res.data && res.data.error) || "Signup failed";
-          addToast(err, "error");
-        }
-      })();
-    } else {
+    if (!formData.name || !formData.email || !formData.password) {
       addToast("Please fill in all fields", "error");
+      return;
     }
+    // Block submit if there's an obvious typo warning still showing
+    if (emailWarning) {
+      addToast("Please fix the email address before continuing", "error");
+      return;
+    }
+    (async () => {
+      setLoading(true);
+      const res = await signup(
+        formData.name,
+        formData.email,
+        formData.password,
+      );
+      setLoading(false);
+      if (res.ok) {
+        const backend = res.data || {};
+        if (backend.dev && backend.otp) {
+          addToast(`DEV MODE — Your OTP: ${backend.otp}`, "success");
+          sessionStorage.setItem("signupOtp", backend.otp);
+          // Keep a separate copy for visible display on the confirm page
+          sessionStorage.setItem("signupDevOtp", backend.otp);
+        } else {
+          addToast(
+            "OTP sent to your email — enter it to complete signup",
+            "success",
+          );
+        }
+        setTimeout(() => navigate("/signup/confirm"), 180);
+      } else {
+        const err =
+          res.error || (res.data && res.data.error) || "Signup failed";
+        addToast(err, "error");
+      }
+    })();
   };
 
   return (
@@ -95,13 +140,25 @@ const SignupPage = () => {
                 onChange={handleChange}
                 required
               />
+              {emailWarning && (
+                <div className="email-typo-warning">
+                  <span>⚠ {emailWarning}</span>
+                  <button
+                    type="button"
+                    className="fix-email-btn"
+                    onClick={handleFixEmail}
+                  >
+                    Fix it
+                  </button>
+                </div>
+              )}
             </div>
             <div className="form-group">
               <label>Password</label>
               <input
                 type="password"
                 name="password"
-                placeholder="Create a password"
+                placeholder="Create a password (min 8 characters)"
                 value={formData.password}
                 onChange={handleChange}
                 required
@@ -119,14 +176,14 @@ const SignupPage = () => {
               />
             </div>
             <Button type="submit" className="auth-button" loading={loading}>
-              Sign Up
+              Continue — Send OTP
             </Button>
           </form>
           <p className="auth-footer">
             Already have an account?{" "}
             <a
               onClick={() => navigate("/login")}
-              style={{ color: "sky blue", cursor: "Pointer" }}
+              style={{ color: "#2563eb", cursor: "pointer" }}
             >
               Login
             </a>

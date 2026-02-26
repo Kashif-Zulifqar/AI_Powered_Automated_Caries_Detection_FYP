@@ -1176,3 +1176,181 @@ html {
     width: 100%;
   }
 }
+
+/* ============================================
+   OTP VERIFICATION PAGE
+   ============================================ */
+.otp-icon-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.otp-mail-icon {
+  color: #2563eb;
+  background: #eff6ff;
+  border-radius: 50%;
+  padding: 12px;
+  box-sizing: content-box;
+}
+
+.otp-target-email {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1e40af;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 6px 14px;
+  display: inline-block;
+  margin: 4px auto 8px;
+  word-break: break-all;
+  text-align: center;
+}
+
+.otp-hint {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin: 0 0 1.5rem;
+  text-align: center;
+}
+
+/* 6-digit OTP boxes */
+.otp-digit-row {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.otp-digit-input {
+  width: 46px;
+  height: 54px;
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  border: 2px solid #d1d5db;
+  border-radius: 10px;
+  outline: none;
+  background: #f9fafb;
+  color: #111827;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+  caret-color: #2563eb;
+}
+
+.otp-digit-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  background: #fff;
+}
+
+.otp-digit-input.filled {
+  border-color: #16a34a;
+  background: #f0fdf4;
+}
+
+/* Resend row */
+.otp-resend-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 1rem;
+}
+
+.otp-resend-label {
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.otp-resend-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #2563eb;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s;
+}
+
+.otp-resend-btn:hover:not(.disabled) {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+.otp-resend-btn.disabled {
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+/* Email typo warning */
+.email-typo-warning {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  padding: 7px 12px;
+  background: #fffbeb;
+  border: 1px solid #fbbf24;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  color: #92400e;
+  gap: 10px;
+}
+
+.fix-email-btn {
+  flex-shrink: 0;
+  background: #f59e0b;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.fix-email-btn:hover {
+  background: #d97706;
+}
+
+/* ── Dev-mode OTP banner (shown only when DEV_MODE=true on backend) ─────── */
+.dev-otp-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 1.25rem;
+  padding: 12px 20px;
+  background: #fefce8;
+  border: 1.5px dashed #ca8a04;
+  border-radius: 10px;
+}
+
+.dev-otp-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #92400e;
+}
+
+.dev-otp-code {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: 0.35em;
+  color: #1d4ed8;
+  font-variant-numeric: tabular-nums;
+}
+
+.dev-otp-note {
+  font-size: 0.75rem;
+  color: #78716c;
+}
