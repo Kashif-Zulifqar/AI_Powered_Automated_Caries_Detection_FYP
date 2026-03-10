@@ -4,12 +4,16 @@ import string
 import datetime as dt
 from dotenv import load_dotenv
 import bcrypt
+import jwt as pyjwt
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
 load_dotenv(override=True)
 
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret")
 serializer = URLSafeTimedSerializer(SECRET_KEY)
+
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRY_DAYS = 7
 
 
 def hash_password(plain: str) -> str:
@@ -21,6 +25,30 @@ def check_password(plain: str, hashed_str: str) -> bool:
         return bcrypt.checkpw(plain.encode("utf-8"), hashed_str.encode("utf-8"))
     except Exception:
         return False
+
+
+# ─── JWT Token Helpers (for login sessions) ──────────────────────────────────
+
+def make_jwt(email: str, name: str = "") -> str:
+    """Create a JWT token for authenticated user sessions."""
+    payload = {
+        "sub": email,
+        "name": name,
+        "iat": dt.datetime.utcnow(),
+        "exp": dt.datetime.utcnow() + dt.timedelta(days=JWT_EXPIRY_DAYS),
+    }
+    return pyjwt.encode(payload, SECRET_KEY, algorithm=JWT_ALGORITHM)
+
+
+def verify_jwt(token: str) -> dict | None:
+    """Verify and decode a JWT token. Returns payload dict or None."""
+    try:
+        return pyjwt.decode(token, SECRET_KEY, algorithms=[JWT_ALGORITHM])
+    except (pyjwt.ExpiredSignatureError, pyjwt.InvalidTokenError):
+        return None
+
+
+# ─── Reset Token Helpers (for password reset flow only) ──────────────────────
 
 
 def make_reset_token(email: str) -> str:

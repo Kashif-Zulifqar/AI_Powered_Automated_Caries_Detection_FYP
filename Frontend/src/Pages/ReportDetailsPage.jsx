@@ -1,31 +1,68 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "../App.jsx";
 import { FileText } from "lucide-react";
+import { useAuth } from "../Contexts/AuthContext";
 import Header from "../Components/Header.jsx";
 import Card from "../Components/Card.jsx";
 import { Button } from "../Components/Button.jsx";
+import Spinner from "../Components/Spinner.jsx";
 import { useToast } from "../Contexts/ToastContext";
 import "./Pages.css";
+
 const ReportDetailsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { authFetch } = useAuth();
   const { addToast } = useToast();
+  const [report, setReport] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const report = {
-    id: id,
-    date: "2024-11-01",
-    confidence: 94,
-    severity: "Low",
-    findings: "Minor enamel demineralization detected in lower left premolar",
-    recommendations:
-      "Maintain good oral hygiene. Follow-up in 6 months recommended.",
-    analysisTime: "3.2 seconds",
-    imageSize: "2.4 MB",
-  };
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await authFetch(`/api/reports/${id}`);
+        if (!cancelled) {
+          if (res.ok) {
+            setReport(await res.json());
+          } else {
+            const err = await res.json();
+            addToast(err.error || "Report not found", "error");
+            navigate("/history");
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          addToast("Failed to load report", "error");
+          navigate("/history");
+        }
+      }
+      if (!cancelled) setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [id, authFetch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDownload = () => {
     addToast("Report downloaded successfully", "success");
   };
+
+  if (loading) {
+    return (
+      <div className="report-details-page">
+        <Header />
+        <div className="report-details-container">
+          <div className="section-loader">
+            <Spinner size={36} />
+            <p>Loading report…</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!report) return null;
 
   return (
     <div className="report-details-page">
@@ -36,7 +73,7 @@ const ReportDetailsPage = () => {
         </button>
 
         <div className="report-header">
-          <h1>Scan Report #{report.id}</h1>
+          <h1>Scan Report</h1>
           <span className="report-date">{report.date}</span>
         </div>
 

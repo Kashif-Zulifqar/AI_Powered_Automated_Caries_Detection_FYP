@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { AuthProvider } from "./Contexts/AuthContext";
+import { AuthProvider, useAuth } from "./Contexts/AuthContext";
 import { ToastProvider } from "./Contexts/ToastContext";
+import Spinner from "./Components/Spinner";
 import LandingPage from "./Pages/LandingPage";
 import LoginPage from "./Pages/LoginPage";
 import SignupPage from "./Pages/SignupPage";
@@ -48,9 +49,17 @@ const Router = () => {
 // Route Matching Component
 const Routes = () => {
   const currentPath = Router();
+  const { isAuthenticated, initializing } = useAuth();
 
-  // Check if user is authenticated (you'll use AuthContext here)
-  const isAuthenticated = localStorage.getItem("dentalUser") !== null;
+  // Show full-page loader while checking stored token
+  if (initializing) {
+    return (
+      <div className="page-loader">
+        <Spinner size={48} />
+        <p>Loading…</p>
+      </div>
+    );
+  }
 
   // Route matching logic
   if (currentPath === "/" || currentPath === "") {

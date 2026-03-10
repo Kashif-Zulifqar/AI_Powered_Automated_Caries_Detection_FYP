@@ -479,6 +479,66 @@ body {
   }
 }
 
+/* ============================================
+   PAGE & SECTION LOADERS
+   ============================================ */
+.page-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: 1rem;
+  background: #f5f7fa;
+}
+
+.page-loader p {
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
+.page-loader .spinner .path {
+  stroke: #2196f3;
+}
+
+.section-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  gap: 1rem;
+}
+
+.section-loader p {
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.section-loader .spinner .path {
+  stroke: #2196f3;
+}
+
+/* Fade-in for content after loading */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dashboard-stats,
+.dashboard-main,
+.history-grid,
+.profile-content,
+.report-content {
+  animation: fadeIn 0.3s ease-out;
+}
+
 @media (max-width: 640px) {
   .header-container {
     padding: 1rem;

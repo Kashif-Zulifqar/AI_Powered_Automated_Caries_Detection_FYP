@@ -30,3 +30,4 @@ except ServerSelectionTimeoutError as e:
 
 db = client[db_name]
 users = db["users"]
+scans = db["scans"]
