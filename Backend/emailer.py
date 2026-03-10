@@ -1,186 +1,223 @@
+"""
+DentalAI — Email Delivery Module
+=================================
+Sends transactional emails (OTP codes, password resets) via:
+
+  1. SMTP (Gmail, Brevo, etc.) — primary transport
+     Set SMTP_HOST, SMTP_USER, SMTP_PASS, and SENDER_EMAIL in .env
+
+  2. Brevo HTTP API — optional alternative
+     Set BREVO_API_KEY + SENDER_EMAIL in .env
+
+Gmail App Password setup:
+  1. Enable 2-Step Verification on your Google Account
+  2. Go to https://myaccount.google.com/apppasswords
+  3. Generate an app password for "Mail"
+  4. Add it to .env as SMTP_PASS
+
+Expected flow:
+  Signup → OTP Generated → Email Sent via SMTP → User Enters OTP → Verification Successful
+"""
+
 import os
-import smtplib
-import html as html_lib
 import re
+import html as html_lib
+import smtplib
+import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.utils import formataddr, parseaddr, formatdate, make_msgid
-from typing import Optional, Tuple
+from email.utils import formataddr, formatdate, make_msgid
+from typing import Optional
 
 import requests
 from dotenv import load_dotenv
 
-# Load environment variables from .env early.
-# override=True ensures .env values always win over stale shell env vars.
+# Always override stale shell env vars with .env values
 load_dotenv(override=True)
 
-# Read SMTP settings — accept both SMTP_* (preferred) and EMAIL_* (legacy) naming
-def _env(*keys, default=None):
-    """Return the first non-empty value from the given env-var names."""
-    for k in keys:
-        v = os.getenv(k)
-        if v and v.strip():
-            return v.strip()
-    return default
+# ─── Logger ──────────────────────────────────────────────────────────────────
+log = logging.getLogger("dentalai.email")
+if not log.handlers:
+    _h = logging.StreamHandler()
+    _h.setFormatter(logging.Formatter(
+        "%(asctime)s [%(name)s] %(levelname)s  %(message)s", datefmt="%H:%M:%S"
+    ))
+    log.addHandler(_h)
+log.setLevel(logging.DEBUG)
 
-SMTP_HOST = _env("SMTP_HOST", "EMAIL_HOST", default="smtp-relay.brevo.com")
-SMTP_PORT = int(_env("SMTP_PORT", "EMAIL_PORT", default="587"))
-SMTP_USER = _env("SMTP_USER", "EMAIL_USER")
-SMTP_PASS = _env("SMTP_PASS", "EMAIL_PASS")
-SMTP_FROM = _env("SMTP_FROM", "EMAIL_FROM", default=SMTP_USER or "no-reply@iads.local")
-SMTP_FROM_NAME = _env("SMTP_FROM_NAME", "EMAIL_FROM_NAME", default="DentalAI Support")
 
-BREVO_API_KEY = os.getenv("BREVO_API_KEY")
-BREVO_API_URL = os.getenv("BREVO_API_URL", "https://api.brevo.com/v3/smtp/email")
-BREVO_SENDER_EMAIL = os.getenv("BREVO_SENDER_EMAIL", SMTP_FROM)
-BREVO_SENDER_NAME = os.getenv("BREVO_SENDER_NAME", SMTP_FROM_NAME)
+# ─── Configuration ───────────────────────────────────────────────────────────
+def _e(key: str, fallback: str = "", *alt_keys: str) -> str:
+    """Read an env var; try alternates if primary is empty."""
+    val = os.getenv(key, "").strip()
+    if val:
+        return val
+    for alt in alt_keys:
+        val = os.getenv(alt, "").strip()
+        if val:
+            return val
+    return fallback
 
+
+BREVO_API_KEY = _e("BREVO_API_KEY")
+SENDER_NAME   = _e("SENDER_NAME", "DentalAI")
+
+# SENDER_EMAIL must be set explicitly — do NOT fall back to SMTP_FROM
+# (Brevo SMTP login e.g. a1192c001@smtp-brevo.com is NOT a valid sender)
+SENDER_EMAIL  = _e("SENDER_EMAIL")
+
+SMTP_HOST = _e("SMTP_HOST", "", "EMAIL_HOST")
+SMTP_PORT = int(_e("SMTP_PORT", "587", "EMAIL_PORT") or "587")
+SMTP_USER = _e("SMTP_USER", "", "EMAIL_USER")
+SMTP_PASS = _e("SMTP_PASS", "", "EMAIL_PASS")
+
+
+# ─── Startup diagnostics ────────────────────────────────────────────────────
+_api_ok  = bool(BREVO_API_KEY and SENDER_EMAIL)
+_smtp_ok = bool(SMTP_HOST and SMTP_USER and SMTP_PASS and SENDER_EMAIL)
+
+log.info("─── Email configuration ───")
+log.info(f"  Sender     : {SENDER_NAME} <{SENDER_EMAIL or 'NOT SET'}>")
+log.info(f"  Brevo API  : {'ready' if _api_ok else 'disabled'}")
+log.info(f"  SMTP       : {'ready (' + SMTP_HOST + ')' if _smtp_ok else 'disabled'}")
+if not _api_ok and not _smtp_ok:
+    log.error("  NO EMAIL TRANSPORT AVAILABLE — set BREVO_API_KEY or SMTP_* plus SENDER_EMAIL in .env")
+log.info("────────────────────────────")
+
+
+# ─── Delivery state ─────────────────────────────────────────────────────────
 _last_error: Optional[str] = None
 
-masked_user = (SMTP_USER or "").split("@", 1)[0] if SMTP_USER else "(none)"
-masked_pass = (SMTP_PASS[:4] + "********") if SMTP_PASS else "(none)"
-print("SMTP configuration loaded:", masked_user, "@", SMTP_HOST, ":", SMTP_PORT)
-print("SMTP_PASS mask:", masked_pass)
-if BREVO_API_KEY:
-    print("Brevo API fallback enabled")
-else:
-    print("Brevo API fallback disabled (BREVO_API_KEY not set)")
 
-
-def get_last_email_error() -> Optional[str]:
+def get_last_error() -> Optional[str]:
+    """Return the error message from the most recent failed send_email() call."""
     return _last_error
 
 
-def _format_from(from_value: str) -> str:
-    """Return a properly formatted From header using parseaddr/formataddr."""
-    name, addr = parseaddr(from_value)
-    if not addr:
-        # Fall back to SMTP_USER if parse fails
-        addr = SMTP_USER or "no-reply@iads.local"
-    if not name:
-        name = SMTP_FROM_NAME or "IADS Support"
-    return formataddr((name, addr))
+# Backward-compat alias used by older auth.py imports
+get_last_email_error = get_last_error
 
 
-def _html_to_text(html: str) -> str:
-    """Strip HTML tags to produce a plain-text fallback body."""
-    text = re.sub(r"<[^>]+>", " ", html)
+# ─── Helpers ─────────────────────────────────────────────────────────────────
+def _html_to_text(html_content: str) -> str:
+    """Convert HTML to plain text for the multipart text/plain fallback."""
+    text = re.sub(r"<br\s*/?>", "\n", html_content, flags=re.IGNORECASE)
+    text = re.sub(r"<[^>]+>", " ", text)
     text = html_lib.unescape(text)
-    return re.sub(r" {2,}", " ", text).strip()
+    return re.sub(r"[ \t]+", " ", text).strip()
 
 
-def _build_message(to_email: str, subject: str, html: str) -> MIMEMultipart:
-    """Build a multipart/alternative message (text + html) with delivery headers."""
-    msg = MIMEMultipart("alternative")
-    msg["From"] = _format_from(SMTP_FROM)
-    msg["To"] = to_email
-    msg["Subject"] = subject
-    msg["Date"] = formatdate(localtime=False)
-    msg["Message-ID"] = make_msgid(domain=(SMTP_FROM.split("@")[-1].rstrip(">").strip() or "dentalai.local"))
-    msg["X-Mailer"] = "DentalAI/1.0"
-    # Plain-text part first — improves spam score
-    msg.attach(MIMEText(_html_to_text(html), "plain", "utf-8"))
-    # HTML part second — mail clients prefer the last part
-    msg.attach(MIMEText(html, "html", "utf-8"))
-    return msg
-
-
-def _send_via_smtp(msg: MIMEMultipart, to_email: str) -> Tuple[bool, Optional[str]]:
-    if not SMTP_HOST:
-        return False, "SMTP host not configured"
-
-    if not SMTP_USER or not SMTP_PASS:
-        print("send_email: SMTP credentials not provided — attempting unauthenticated send")
-
-    try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as server:
-            server.ehlo()
-            try:
-                server.starttls()
-                server.ehlo()
-            except Exception as e:
-                print(f"starttls not used: {e}")
-
-            if SMTP_USER and SMTP_PASS:
-                try:
-                    server.login(SMTP_USER, SMTP_PASS)
-                except smtplib.SMTPAuthenticationError as e:
-                    print(f"SMTP authentication error: {e}")
-                    return False, f"SMTP authentication failed: {e}"
-                except Exception as e:
-                    print(f"SMTP login failed: {e}")
-                    return False, f"SMTP login failed: {e}"
-
-            server.send_message(msg)
-            print(f"Email successfully sent to {to_email} via SMTP")
-            return True, None
-    except Exception as e:
-        print(f"Email sending failed via SMTP: {e}")
-        return False, f"SMTP delivery failed: {e}"
-
-
-def _send_via_brevo_api(to_email: str, subject: str, html: str) -> Tuple[bool, Optional[str]]:
+def _via_brevo_api(to: str, subject: str, html: str) -> tuple:
+    """Send via Brevo transactional email HTTP API."""
     if not BREVO_API_KEY:
-        return False, "Brevo API key not configured"
-
-    payload = {
-        "sender": {
-            "email": BREVO_SENDER_EMAIL,
-            "name": BREVO_SENDER_NAME,
-        },
-        "to": [{"email": to_email}],
-        "subject": subject,
-        "htmlContent": html,
-    }
-
-    headers = {
-        "accept": "application/json",
-        "api-key": BREVO_API_KEY,
-        "content-type": "application/json",
-    }
+        return False, "BREVO_API_KEY not set"
+    if not SENDER_EMAIL:
+        return False, "SENDER_EMAIL not set — add a verified sender email to .env"
 
     try:
-        response = requests.post(
-            BREVO_API_URL,
-            json=payload,
-            headers=headers,
-            timeout=20,
+        resp = requests.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={
+                "accept": "application/json",
+                "content-type": "application/json",
+                "api-key": BREVO_API_KEY,
+            },
+            json={
+                "sender": {"email": SENDER_EMAIL, "name": SENDER_NAME},
+                "to": [{"email": to}],
+                "subject": subject,
+                "htmlContent": html,
+                "textContent": _html_to_text(html),
+            },
+            timeout=15,
         )
-        response.raise_for_status()
-        print(f"Email successfully sent to {to_email} via Brevo API")
-        return True, None
+        if resp.ok:
+            mid = resp.json().get("messageId", "?")
+            log.info(f"Brevo API  -> {to}  (messageId: {mid})")
+            return True, None
+        detail = resp.text[:300]
+        log.error(f"Brevo API FAIL -> {to}  HTTP {resp.status_code}: {detail}")
+        return False, f"Brevo API {resp.status_code}: {detail}"
     except requests.RequestException as exc:
-        detail = None
-        if exc.response is not None:
-            try:
-                detail = exc.response.text
-            except Exception:
-                detail = repr(exc)
-        print(f"Brevo API send failed: {exc} {detail or ''}")
-        return False, f"Brevo API delivery failed: {detail or exc}"
+        log.error(f"Brevo API exception: {exc}")
+        return False, f"Brevo API request error: {exc}"
 
 
-def send_email(to_email: str, subject: str, html: str):
-    """Send an HTML email using SMTP or Brevo's transactional API."""
+def _via_smtp(to: str, subject: str, html: str) -> tuple:
+    """Send via SMTP relay (Brevo SMTP, Gmail, etc.)."""
+    if not (SMTP_HOST and SMTP_USER and SMTP_PASS):
+        return False, "SMTP not fully configured (need SMTP_HOST, SMTP_USER, SMTP_PASS)"
+    if not SENDER_EMAIL:
+        return False, "SENDER_EMAIL not set — required as the From address for SMTP delivery"
 
+    from_addr = SENDER_EMAIL
+
+    msg = MIMEMultipart("alternative")
+    msg["From"]       = formataddr((SENDER_NAME, from_addr))
+    msg["To"]         = to
+    msg["Subject"]    = subject
+    msg["Date"]       = formatdate(localtime=False)
+    msg["Message-ID"] = make_msgid(domain=from_addr.split("@")[-1])
+    msg.attach(MIMEText(_html_to_text(html), "plain", "utf-8"))
+    msg.attach(MIMEText(html, "html", "utf-8"))
+
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as srv:
+            srv.ehlo()
+            srv.starttls()
+            srv.ehlo()
+            srv.login(SMTP_USER, SMTP_PASS)
+            srv.send_message(msg)
+        log.info(f"SMTP -> {to}")
+        return True, None
+    except smtplib.SMTPAuthenticationError as e:
+        log.error(f"SMTP auth failed: {e}")
+        return False, f"SMTP authentication failed: {e}"
+    except Exception as e:
+        log.error(f"SMTP send failed: {e}")
+        return False, f"SMTP error: {e}"
+
+
+# ─── Public API ──────────────────────────────────────────────────────────────
+def send_email(to_email: str, subject: str, html: str) -> bool:
+    """
+    Send an HTML email to *to_email*.
+
+    Tries SMTP first (Gmail/Brevo/etc.), falls back to Brevo HTTP API.
+    Returns True on success, False on failure.
+    Call get_last_error() after a failure for the reason.
+    """
     global _last_error
     _last_error = None
+    errors = []
 
-    msg = _build_message(to_email, subject, html)
+    # Method 1: SMTP (primary — Gmail, Brevo relay, etc.)
+    if SMTP_HOST and SMTP_USER and SMTP_PASS:
+        try:
+            ok, err = _via_smtp(to_email, subject, html)
+            if ok:
+                return True
+            if err:
+                errors.append(err)
+        except Exception as exc:
+            errors.append(f"SMTP exception: {exc}")
+            log.exception("SMTP unexpected error")
 
-    smtp_success, smtp_error = _send_via_smtp(msg, to_email)
-    if smtp_success:
-        return True
-    if smtp_error:
-        _last_error = smtp_error
-
+    # Method 2: Brevo HTTP API (fallback if SMTP not configured or failed)
     if BREVO_API_KEY:
-        api_success, api_error = _send_via_brevo_api(to_email, subject, html)
-        if api_success:
-            return True
-        if api_error:
-            _last_error = api_error
-    elif not _last_error:
-        _last_error = "Neither SMTP nor Brevo API credentials are configured"
+        try:
+            ok, err = _via_brevo_api(to_email, subject, html)
+            if ok:
+                return True
+            if err:
+                errors.append(err)
+        except Exception as exc:
+            errors.append(f"Brevo API exception: {exc}")
+            log.exception("Brevo API unexpected error")
 
+    # Nothing worked
+    if not errors:
+        errors.append("No email transport configured — set BREVO_API_KEY or SMTP_* in .env")
+    _last_error = " | ".join(errors)
+    log.error(f"All delivery methods FAILED for {to_email}: {_last_error}")
     return False
