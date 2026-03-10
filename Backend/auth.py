@@ -5,14 +5,16 @@ Handles user registration (OTP email verification), login,
 password reset (forgot-password flow), and user profile retrieval.
 """
 
-from flask import Blueprint, request, jsonify
-from db import users
+from flask import Blueprint, request, jsonify, g
+from db import users, scans
 from utils import (
     hash_password, check_password,
     generate_otp, hash_otp, check_otp,
     now_utc, plus_minutes,
     make_reset_token, read_reset_token,
+    make_jwt, verify_jwt,
 )
+from middleware import login_required
 from emailer import send_email, get_last_error
 import os
 import logging
@@ -173,28 +175,98 @@ def login():
     if not check_password(password, user.get("password", "")):
         return jsonify({"error": "Invalid email or password"}), 401
 
-    token = make_reset_token(email)
+    token = make_jwt(email, user["name"])
     return jsonify({
         "message": "Login successful",
         "token": token,
         "name": user["name"],
+        "email": email,
     }), 200
 
 
 # ─── 4. Current User ────────────────────────────────────────────────────────
 
 @auth.get("/me")
+@login_required
 def get_user():
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    email = read_reset_token(token)
-    if not email:
-        return jsonify({"error": "Invalid or expired token"}), 401
+    """Return the current authenticated user's profile."""
+    return jsonify(g.current_user), 200
 
-    user = users.find_one({"email": email}, {"_id": 0, "password": 0})
-    if not user:
-        return jsonify({"error": "User not found"}), 404
 
-    return jsonify(user), 200
+# ─── Profile Update ──────────────────────────────────────────────────────────
+
+@auth.put("/profile")
+@login_required
+def update_profile():
+    """Update the authenticated user's profile fields."""
+    data = request.get_json(force=True, silent=True) or {}
+    email = g.current_user["email"]
+
+    # Only allow safe fields to be updated
+    allowed_fields = {"name", "age", "gender"}
+    updates = {}
+    for key in allowed_fields:
+        if key in data and data[key] is not None:
+            updates[key] = data[key]
+
+    if not updates:
+        return jsonify({"error": "No valid fields to update"}), 400
+
+    users.update_one({"email": email}, {"$set": updates})
+
+    # Return updated user
+    user = users.find_one(
+        {"email": email},
+        {"password": 0, "otpHash": 0, "otpExpires": 0},
+    )
+    user["_id"] = str(user["_id"])
+    return jsonify({"message": "Profile updated", "user": user}), 200
+
+
+# ─── Change Password ─────────────────────────────────────────────────────────
+
+@auth.post("/change-password")
+@login_required
+def change_password():
+    """Change password for the authenticated user (requires current password)."""
+    data = request.get_json(force=True, silent=True) or {}
+    current_pw = data.get("currentPassword") or ""
+    new_pw     = data.get("newPassword") or ""
+    confirm_pw = data.get("confirmPassword") or ""
+
+    if not current_pw or not new_pw:
+        return jsonify({"error": "Current and new passwords are required"}), 400
+    if new_pw != confirm_pw:
+        return jsonify({"error": "New passwords do not match"}), 400
+    if len(new_pw) < 6:
+        return jsonify({"error": "Password must be at least 6 characters"}), 400
+
+    user = users.find_one({"email": g.current_user["email"]})
+    if not check_password(current_pw, user.get("password", "")):
+        return jsonify({"error": "Current password is incorrect"}), 400
+
+    users.update_one(
+        {"email": g.current_user["email"]},
+        {"$set": {"password": hash_password(new_pw)}},
+    )
+    return jsonify({"message": "Password changed successfully"}), 200
+
+
+# ─── Delete Account ──────────────────────────────────────────────────────────
+
+@auth.delete("/delete-account")
+@login_required
+def delete_account():
+    """Permanently delete the authenticated user's account and all their data."""
+    email = g.current_user["email"]
+
+    # Delete all user scans/reports
+    scans.delete_many({"user_email": email})
+    # Delete the user record
+    users.delete_one({"email": email})
+
+    log.info(f"Account deleted: {email}")
+    return jsonify({"message": "Account deleted successfully"}), 200
 
 
 # ─── 5. Forgot Password: Step 1 — Send OTP ──────────────────────────────────

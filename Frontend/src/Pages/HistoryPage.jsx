@@ -1,50 +1,37 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "../App";
 import { Upload, FileText } from "lucide-react";
+import { useAuth } from "../Contexts/AuthContext";
 import Header from "../Components/Header.jsx";
 import "./Pages.css";
 import Card from "../Components/Card.jsx";
 import { Button } from "../Components/Button.jsx";
+import Spinner from "../Components/Spinner.jsx";
+
 const HistoryPage = () => {
   const navigate = useNavigate();
+  const { authFetch } = useAuth();
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const reports = [
-    {
-      id: 1,
-      date: "2024-11-01",
-      confidence: 94,
-      severity: "Low",
-      status: "Completed",
-    },
-    {
-      id: 2,
-      date: "2024-10-28",
-      confidence: 87,
-      severity: "Moderate",
-      status: "Completed",
-    },
-    {
-      id: 3,
-      date: "2024-10-25",
-      confidence: 91,
-      severity: "Low",
-      status: "Completed",
-    },
-    {
-      id: 4,
-      date: "2024-10-20",
-      confidence: 78,
-      severity: "High",
-      status: "Completed",
-    },
-    {
-      id: 5,
-      date: "2024-10-15",
-      confidence: 92,
-      severity: "Low",
-      status: "Completed",
-    },
-  ];
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await authFetch("/api/reports");
+        if (!cancelled && res.ok) {
+          const data = await res.json();
+          setReports(data.reports || []);
+        }
+      } catch {
+        /* ignore */
+      }
+      if (!cancelled) setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authFetch]);
 
   return (
     <div className="history-page">
@@ -57,7 +44,12 @@ const HistoryPage = () => {
           </Button>
         </div>
 
-        {reports.length > 0 ? (
+        {loading ? (
+          <div className="section-loader">
+            <Spinner size={36} />
+            <p>Loading reports…</p>
+          </div>
+        ) : reports.length > 0 ? (
           <div className="history-grid">
             {reports.map((report) => (
               <Card
@@ -70,7 +62,7 @@ const HistoryPage = () => {
                   <span className="report-date">{report.date}</span>
                 </div>
                 <div className="history-card-body">
-                  <h3>Scan #{report.id}</h3>
+                  <h3>Scan Report</h3>
                   <div className="report-stats">
                     <div className="stat">
                       <span className="stat-label">Severity</span>

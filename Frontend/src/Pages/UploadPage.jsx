@@ -1,16 +1,19 @@
 import React, { useState } from "react";
 import { useNavigate } from "../App.jsx";
 import { Upload, Camera, FileText } from "lucide-react";
+import { useAuth } from "../Contexts/AuthContext";
 import Header from "../Components/Header.jsx";
 import Card from "../Components/Card.jsx";
 import { Button } from "../Components/Button.jsx";
 import { useToast } from "../Contexts/ToastContext";
 import "./Pages.css";
+
 const UploadPage = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const { authFetch } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
 
@@ -41,7 +44,7 @@ const UploadPage = () => {
     }
   };
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     if (!selectedFile) {
       addToast("Please select a file first", "error");
       return;
@@ -50,20 +53,38 @@ const UploadPage = () => {
     setUploading(true);
     setProgress(0);
 
+    // Simulate progress while uploading
     const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setTimeout(() => {
-            setUploading(false);
-            addToast("Analysis complete!", "success");
-            navigate("/results");
-          }, 500);
-          return 100;
-        }
-        return prev + 10;
+      setProgress((prev) => (prev >= 90 ? 90 : prev + 10));
+    }, 200);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+
+      const res = await authFetch("/api/upload", {
+        method: "POST",
+        body: formData,
       });
-    }, 300);
+      clearInterval(interval);
+      setProgress(100);
+
+      const data = await res.json();
+      if (res.ok) {
+        addToast("Analysis complete!", "success");
+        setTimeout(() => {
+          setUploading(false);
+          navigate(`/report/${data.reportId}`);
+        }, 500);
+      } else {
+        setUploading(false);
+        addToast(data.error || "Upload failed", "error");
+      }
+    } catch (err) {
+      clearInterval(interval);
+      setUploading(false);
+      addToast(err.message || "Upload failed", "error");
+    }
   };
 
   return (

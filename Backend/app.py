@@ -3,6 +3,7 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
 from auth import auth
+from api import api
 
 load_dotenv(override=True)
 
@@ -33,6 +34,7 @@ def create_app():
 
     # Register blueprints
     app.register_blueprint(auth)
+    app.register_blueprint(api)
 
     return app
 

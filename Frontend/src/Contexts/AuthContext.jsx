@@ -1,58 +1,76 @@
-import React, { useState, createContext, useContext, useEffect } from "react";
-import {
-  Camera,
-  Upload,
-  FileText,
-  User,
-  LogOut,
-  Bell,
-  CheckCircle,
-  AlertCircle,
-  XCircle,
-} from "lucide-react";
+import React, {
+  useState,
+  createContext,
+  useContext,
+  useEffect,
+  useCallback,
+} from "react";
 
 // ============================================
-// CONTEXT - Auth & User Management
+// CONTEXT — Auth, Token Management & API Calls
 // ============================================
 const AuthContext = createContext();
 
 const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [initializing, setInitializing] = useState(true);
   const API_BASE = import.meta.env.VITE_API_URL || "";
 
-  useEffect(() => {
-    const storedUser = localStorage.getItem("dentalUser");
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-      setIsAuthenticated(true);
-    }
+  // ─── Token helpers ──────────────────────────────────────────────────────
+  const getToken = () => localStorage.getItem("dentalToken");
+
+  const clearSession = useCallback(() => {
+    localStorage.removeItem("dentalToken");
+    localStorage.removeItem("dentalUser");
+    setUser(null);
+    setIsAuthenticated(false);
   }, []);
 
-  // On mount, try to fetch current user if token present
+  /**
+   * Authenticated fetch — attaches Bearer token, handles 401 auto-logout.
+   * Use for all protected API calls.
+   */
+  const authFetch = useCallback(
+    async (url, options = {}) => {
+      const token = getToken();
+      const headers = { ...(options.headers || {}) };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      if (!(options.body instanceof FormData) && !headers["Content-Type"]) {
+        headers["Content-Type"] = "application/json";
+      }
+      const res = await fetch(`${API_BASE}${url}`, { ...options, headers });
+      if (res.status === 401) clearSession();
+      return res;
+    },
+    [API_BASE, clearSession],
+  );
+
+  // ─── On mount: validate stored token ────────────────────────────────────
   useEffect(() => {
-    const token = localStorage.getItem("dentalToken");
-    if (token) {
-      fetch(`${API_BASE}/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then((r) => r.json())
-        .then((data) => {
-          if (!data.error) {
-            setUser(data);
-            setIsAuthenticated(true);
-            localStorage.setItem("dentalUser", JSON.stringify(data));
-          } else {
-            localStorage.removeItem("dentalToken");
-            localStorage.removeItem("dentalUser");
-          }
-        })
-        .catch(() => {
-          localStorage.removeItem("dentalToken");
-          localStorage.removeItem("dentalUser");
-        });
+    const token = getToken();
+    if (!token) {
+      setInitializing(false);
+      return;
     }
-  }, []);
+    fetch(`${API_BASE}/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.error) {
+          setUser(data);
+          setIsAuthenticated(true);
+          localStorage.setItem("dentalUser", JSON.stringify(data));
+        } else {
+          clearSession();
+        }
+      })
+      .catch(() => clearSession())
+      .finally(() => setInitializing(false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ─── Auth actions ───────────────────────────────────────────────────────
 
   const login = async (email, password) => {
     try {
@@ -64,7 +82,7 @@ const AuthProvider = ({ children }) => {
       const data = await res.json();
       if (res.ok && data.token) {
         localStorage.setItem("dentalToken", data.token);
-        const userObj = { email, name: data.name };
+        const userObj = { email: data.email || email, name: data.name };
         localStorage.setItem("dentalUser", JSON.stringify(userObj));
         setUser(userObj);
         setIsAuthenticated(true);
@@ -76,7 +94,6 @@ const AuthProvider = ({ children }) => {
     }
   };
 
-  // Start signup: call register-start, then store pending data in sessionStorage
   const signup = async (name, email, password) => {
     try {
       const res = await fetch(`${API_BASE}/auth/register-start`, {
@@ -86,7 +103,6 @@ const AuthProvider = ({ children }) => {
       });
       const data = await res.json();
       if (res.ok) {
-        // store pending signup details for confirmation step
         sessionStorage.setItem(
           "signupPending",
           JSON.stringify({ name, email, password }),
@@ -99,7 +115,6 @@ const AuthProvider = ({ children }) => {
     }
   };
 
-  // Complete signup using OTP
   const completeSignup = async (otp) => {
     const pending = sessionStorage.getItem("signupPending");
     if (!pending) return { ok: false, error: "No pending signup found" };
@@ -117,7 +132,6 @@ const AuthProvider = ({ children }) => {
       });
       const data = await res.json();
       if (res.status === 201) {
-        // auto-login after successful registration
         sessionStorage.removeItem("signupPending");
         const loginRes = await login(email, password);
         return loginRes.ok
@@ -130,7 +144,26 @@ const AuthProvider = ({ children }) => {
     }
   };
 
-  // Forgot password: Step 1 — send OTP to email
+  const resendSignupOtp = async () => {
+    const pending = sessionStorage.getItem("signupPending");
+    if (!pending) return { ok: false, error: "No pending signup session" };
+    const { name, email } = JSON.parse(pending);
+    try {
+      const res = await fetch(`${API_BASE}/auth/register-start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email }),
+      });
+      const data = await res.json();
+      if (res.ok) return { ok: true, data };
+      return { ok: false, error: data.error || "Resend failed" };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  };
+
+  // ─── Forgot password flow ──────────────────────────────────────────────
+
   const forgotStart = async (email) => {
     try {
       const res = await fetch(`${API_BASE}/auth/forgot-start`, {
@@ -149,7 +182,6 @@ const AuthProvider = ({ children }) => {
     }
   };
 
-  // Forgot password: Step 2 — verify OTP
   const forgotVerifyOtp = async (otp) => {
     const email = sessionStorage.getItem("forgotEmail");
     if (!email) return { ok: false, error: "Session expired — start again" };
@@ -170,7 +202,6 @@ const AuthProvider = ({ children }) => {
     }
   };
 
-  // Forgot password: Step 3 — set new password
   const forgotReset = async (password, confirmPassword) => {
     const email = sessionStorage.getItem("forgotEmail");
     if (!email) return { ok: false, error: "Session expired — start again" };
@@ -183,7 +214,6 @@ const AuthProvider = ({ children }) => {
       const data = await res.json();
       if (res.ok) {
         sessionStorage.removeItem("forgotEmail");
-        sessionStorage.removeItem("forgotDevOtp");
         sessionStorage.removeItem("forgotOtpVerified");
         return { ok: true };
       }
@@ -193,46 +223,67 @@ const AuthProvider = ({ children }) => {
     }
   };
 
-  // Resend OTP for pending signup – re-calls register-start with stored details
-  const resendSignupOtp = async () => {
-    const pending = sessionStorage.getItem("signupPending");
-    if (!pending) return { ok: false, error: "No pending signup session" };
-    const { name, email } = JSON.parse(pending);
+  // ─── Profile actions ───────────────────────────────────────────────────
+
+  const updateProfile = async (updatedData) => {
     try {
-      const res = await fetch(`${API_BASE}/auth/register-start`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email }),
+      const res = await authFetch("/auth/profile", {
+        method: "PUT",
+        body: JSON.stringify(updatedData),
       });
       const data = await res.json();
       if (res.ok) {
-        if (data.dev && data.otp) sessionStorage.setItem("signupOtp", data.otp);
-        return { ok: true, data };
+        const newUser = data.user || { ...user, ...updatedData };
+        setUser(newUser);
+        localStorage.setItem("dentalUser", JSON.stringify(newUser));
+        return { ok: true };
       }
-      return { ok: false, error: data.error || "Resend failed" };
+      return { ok: false, error: data.error || "Update failed" };
     } catch (err) {
       return { ok: false, error: err.message };
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem("dentalUser");
-    localStorage.removeItem("dentalToken");
-    setUser(null);
-    setIsAuthenticated(false);
+  const changePassword = async (
+    currentPassword,
+    newPassword,
+    confirmPassword,
+  ) => {
+    try {
+      const res = await authFetch("/auth/change-password", {
+        method: "POST",
+        body: JSON.stringify({ currentPassword, newPassword, confirmPassword }),
+      });
+      const data = await res.json();
+      if (res.ok) return { ok: true };
+      return { ok: false, error: data.error || "Password change failed" };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
   };
 
-  const updateProfile = (updatedData) => {
-    const updatedUser = { ...user, ...updatedData };
-    localStorage.setItem("dentalUser", JSON.stringify(updatedUser));
-    setUser(updatedUser);
+  const deleteAccount = async () => {
+    try {
+      const res = await authFetch("/auth/delete-account", { method: "DELETE" });
+      const data = await res.json();
+      if (res.ok) {
+        clearSession();
+        return { ok: true };
+      }
+      return { ok: false, error: data.error || "Delete failed" };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
   };
+
+  const logout = () => clearSession();
 
   return (
     <AuthContext.Provider
       value={{
         user,
         isAuthenticated,
+        initializing,
         login,
         signup,
         completeSignup,
@@ -242,6 +293,9 @@ const AuthProvider = ({ children }) => {
         forgotReset,
         logout,
         updateProfile,
+        changePassword,
+        deleteAccount,
+        authFetch,
       }}
     >
       {children}
