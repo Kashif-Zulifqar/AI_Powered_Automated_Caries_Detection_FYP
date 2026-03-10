@@ -88,18 +88,10 @@ const SignupPage = () => {
       );
       setLoading(false);
       if (res.ok) {
-        const backend = res.data || {};
-        if (backend.dev && backend.otp) {
-          addToast(`DEV MODE — Your OTP: ${backend.otp}`, "success");
-          sessionStorage.setItem("signupOtp", backend.otp);
-          // Keep a separate copy for visible display on the confirm page
-          sessionStorage.setItem("signupDevOtp", backend.otp);
-        } else {
-          addToast(
-            "OTP sent to your email — enter it to complete signup",
-            "success",
-          );
-        }
+        addToast(
+          "OTP sent to your email — enter it to complete signup",
+          "success",
+        );
         setTimeout(() => navigate("/signup/confirm"), 180);
       } else {
         const err =

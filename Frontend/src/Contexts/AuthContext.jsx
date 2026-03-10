@@ -19,7 +19,7 @@ const AuthContext = createContext();
 const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
+  const API_BASE = import.meta.env.VITE_API_URL || "";
 
   useEffect(() => {
     const storedUser = localStorage.getItem("dentalUser");
@@ -91,10 +91,6 @@ const AuthProvider = ({ children }) => {
           "signupPending",
           JSON.stringify({ name, email, password }),
         );
-        // If backend returned OTP in dev-mode, also store it for confirmation prefilling
-        if (data.dev && data.otp) {
-          sessionStorage.setItem("signupOtp", data.otp);
-        }
         return { ok: true, data };
       }
       return { ok: false, error: data.error || "Signup failed", data };
@@ -129,6 +125,69 @@ const AuthProvider = ({ children }) => {
           : { ok: false, error: "Registration succeeded but login failed" };
       }
       return { ok: false, error: data.error || "Registration failed" };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  };
+
+  // Forgot password: Step 1 — send OTP to email
+  const forgotStart = async (email) => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/forgot-start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        sessionStorage.setItem("forgotEmail", email);
+        return { ok: true, data };
+      }
+      return { ok: false, error: data.error || "Failed to send OTP" };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  };
+
+  // Forgot password: Step 2 — verify OTP
+  const forgotVerifyOtp = async (otp) => {
+    const email = sessionStorage.getItem("forgotEmail");
+    if (!email) return { ok: false, error: "Session expired — start again" };
+    try {
+      const res = await fetch(`${API_BASE}/auth/forgot-verify-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, otp }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        sessionStorage.setItem("forgotOtpVerified", "true");
+        return { ok: true };
+      }
+      return { ok: false, error: data.error || "Invalid OTP" };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  };
+
+  // Forgot password: Step 3 — set new password
+  const forgotReset = async (password, confirmPassword) => {
+    const email = sessionStorage.getItem("forgotEmail");
+    if (!email) return { ok: false, error: "Session expired — start again" };
+    try {
+      const res = await fetch(`${API_BASE}/auth/forgot-reset`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, confirmPassword }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        sessionStorage.removeItem("forgotEmail");
+        sessionStorage.removeItem("forgotDevOtp");
+        sessionStorage.removeItem("forgotOtpVerified");
+        return { ok: true };
+      }
+      return { ok: false, error: data.error || "Password reset failed" };
     } catch (err) {
       return { ok: false, error: err.message };
     }
@@ -178,6 +237,9 @@ const AuthProvider = ({ children }) => {
         signup,
         completeSignup,
         resendSignupOtp,
+        forgotStart,
+        forgotVerifyOtp,
+        forgotReset,
         logout,
         updateProfile,
       }}
