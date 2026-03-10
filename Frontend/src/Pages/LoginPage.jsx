@@ -65,7 +65,11 @@ const LoginPage = () => {
                 required
               />
             </div>
-            <a href="#" className="forgot-password">
+            <a
+              onClick={() => navigate("/forgot-password")}
+              className="forgot-password"
+              style={{ cursor: "pointer" }}
+            >
               Forgot Password?
             </a>
             <Button type="submit" className="auth-button" loading={loading}>

@@ -11,6 +11,9 @@ import ResultsPage from "./Pages/ResultsPage";
 import HistoryPage from "./Pages/HistoryPage";
 import ReportDetailsPage from "./Pages/ReportDetailsPage";
 import ProfilePage from "./Pages/ProfilePage";
+import ForgotPasswordPage from "./Pages/ForgotPasswordPage";
+import ForgotOtpPage from "./Pages/ForgotOtpPage";
+import ForgotResetPage from "./Pages/ForgotResetPage";
 
 // Simple Hash Router Hook
 export const useNavigate = () => {
@@ -58,6 +61,12 @@ const Routes = () => {
     return <SignupPage />;
   } else if (currentPath === "/signup/confirm") {
     return <SignupConfirmPage />;
+  } else if (currentPath === "/forgot-password") {
+    return <ForgotPasswordPage />;
+  } else if (currentPath === "/forgot-otp") {
+    return <ForgotOtpPage />;
+  } else if (currentPath === "/forgot-reset") {
+    return <ForgotResetPage />;
   } else if (currentPath === "/dashboard") {
     return isAuthenticated ? <DashboardPage /> : <LoginPage />;
   } else if (currentPath === "/upload") {

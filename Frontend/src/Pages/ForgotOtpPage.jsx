@@ -1,3 +1,8 @@
+/**
+ * ForgotOtpPage — Step 2
+ * User enters the 6-digit OTP that was emailed to them.
+ * Flow: ForgotPasswordPage → ForgotOtpPage → ForgotResetPage → LoginPage
+ */
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "../App";
 import { useAuth } from "../Contexts/AuthContext";
@@ -8,22 +13,25 @@ import { Button } from "../Components/Button.jsx";
 import { Mail, RefreshCw } from "lucide-react";
 import "./Pages.css";
 
-const RESEND_COOLDOWN = 60; // seconds
+const RESEND_COOLDOWN = 60;
 
-const SignupConfirmPage = () => {
+const ForgotOtpPage = () => {
   const [digits, setDigits] = useState(Array(6).fill(""));
   const [loading, setLoading] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const inputRefs = useRef([]);
-  const { completeSignup, resendSignupOtp } = useAuth();
+  const { forgotVerifyOtp, forgotStart } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
 
-  // Read target email from pending session
-  const pending = JSON.parse(sessionStorage.getItem("signupPending") || "{}");
-  const targetEmail = pending.email || "your email";
+  const targetEmail = sessionStorage.getItem("forgotEmail") || "your email";
 
   useEffect(() => {
+    // Guard: if no email in session, user landed here directly — send back
+    if (!sessionStorage.getItem("forgotEmail")) {
+      navigate("/forgot-password");
+      return;
+    }
     inputRefs.current[0]?.focus();
   }, []);
 
@@ -35,13 +43,11 @@ const SignupConfirmPage = () => {
   }, [cooldown]);
 
   const handleDigitChange = (index, value) => {
-    const cleaned = value.replace(/\D/g, "").slice(-1); // only last digit
+    const cleaned = value.replace(/\D/g, "").slice(-1);
     const next = [...digits];
     next[index] = cleaned;
     setDigits(next);
-    if (cleaned && index < 5) {
-      inputRefs.current[index + 1]?.focus();
-    }
+    if (cleaned && index < 5) inputRefs.current[index + 1]?.focus();
   };
 
   const handleKeyDown = (index, e) => {
@@ -66,15 +72,16 @@ const SignupConfirmPage = () => {
     e.preventDefault();
     const otp = digits.join("");
     if (otp.length !== 6) {
-      addToast("Please enter the full 6-digit OTP", "error");
+      addToast("Please enter the full 6-digit code", "error");
       return;
     }
     setLoading(true);
-    const res = await completeSignup(otp);
+    const res = await forgotVerifyOtp(otp);
     setLoading(false);
     if (res.ok) {
-      addToast("Account created \u2014 welcome to DentalAI!", "success");
-      navigate("/dashboard");
+      sessionStorage.removeItem("forgotDevOtp");
+      addToast("OTP verified — set your new password", "success");
+      navigate("/forgot-reset");
     } else {
       addToast(res.error || "OTP verification failed", "error");
       setDigits(Array(6).fill(""));
@@ -84,10 +91,10 @@ const SignupConfirmPage = () => {
 
   const handleResend = async () => {
     if (cooldown > 0) return;
-    const res = await resendSignupOtp();
+    const res = await forgotStart(targetEmail);
     if (res.ok) {
       setDigits(Array(6).fill(""));
-      addToast("New OTP sent to your email", "success");
+      addToast("New reset code sent to your email", "success");
       setCooldown(RESEND_COOLDOWN);
       inputRefs.current[0]?.focus();
     } else {
@@ -103,12 +110,10 @@ const SignupConfirmPage = () => {
           <div className="otp-icon-wrap">
             <Mail size={40} strokeWidth={1.5} className="otp-mail-icon" />
           </div>
-          <h1>Check Your Email</h1>
+          <h1>Enter Reset Code</h1>
           <p className="auth-subtitle">We sent a 6-digit code to</p>
           <p className="otp-target-email">{targetEmail}</p>
-          <p className="otp-hint">
-            Enter it below to complete your registration.
-          </p>
+          <p className="otp-hint">Enter it below to continue.</p>
 
           <form onSubmit={handleSubmit} className="auth-form">
             <div className="otp-digit-row" onPaste={handlePaste}>
@@ -127,9 +132,8 @@ const SignupConfirmPage = () => {
                 />
               ))}
             </div>
-
             <Button type="submit" className="auth-button" loading={loading}>
-              Verify & Complete Signup
+              Verify Code
             </Button>
           </form>
 
@@ -142,14 +146,14 @@ const SignupConfirmPage = () => {
               disabled={cooldown > 0}
             >
               <RefreshCw size={14} />
-              {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend OTP"}
+              {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend Code"}
             </button>
           </div>
 
           <p className="auth-footer">
             Wrong email?{" "}
             <a
-              onClick={() => navigate("/signup")}
+              onClick={() => navigate("/forgot-password")}
               style={{ cursor: "pointer" }}
             >
               Go back
@@ -161,4 +165,4 @@ const SignupConfirmPage = () => {
   );
 };
 
-export default SignupConfirmPage;
+export default ForgotOtpPage;
