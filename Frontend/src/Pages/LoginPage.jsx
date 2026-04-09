@@ -6,7 +6,6 @@ import Header from "../Components/Header.jsx";
 import Card from "../Components/Card.jsx";
 import { Button } from "../Components/Button.jsx";
 import "./Pages.css";
-import { Pointer } from "lucide-react";
 const LoginPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -17,6 +16,8 @@ const LoginPage = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (loading) return;
+
     (async () => {
       if (email && password) {
         setLoading(true);
@@ -72,7 +73,12 @@ const LoginPage = () => {
             >
               Forgot Password?
             </a>
-            <Button type="submit" className="auth-button" loading={loading}>
+            <Button
+              type="submit"
+              className="auth-button"
+              loading={loading}
+              loadingText="Logging you in..."
+            >
               Login
             </Button>
           </form>
