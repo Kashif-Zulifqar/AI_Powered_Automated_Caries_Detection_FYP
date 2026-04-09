@@ -26,6 +26,7 @@ export const useNavigate = () => {
 const RouteContext = createContext({
   currentPath: window.location.hash.slice(1) || "/",
   transitionStage: "idle",
+  transitionEnabled: false,
   isTransitioning: false,
 });
 
@@ -38,9 +39,24 @@ export const useParams = () => {
   return { id: parts[parts.length - 1] };
 };
 
+const CORE_ROUTES = [
+  "/dashboard",
+  "/upload",
+  "/results",
+  "/history",
+  "/profile",
+];
+
+const isCoreRoute = (path) => {
+  if (!path) return false;
+  const normalized = path.split("?")[0];
+  if (normalized.startsWith("/report/")) return true;
+  return CORE_ROUTES.includes(normalized);
+};
+
 // Router Component
-const ROUTE_EXIT_MS = 260;
-const ROUTE_ENTER_MS = 520;
+const ROUTE_EXIT_MS = 200;
+const ROUTE_ENTER_MS = 380;
 
 const Router = () => {
   const [currentPath, setCurrentPath] = useState(
@@ -48,12 +64,24 @@ const Router = () => {
   );
   const [pendingPath, setPendingPath] = useState(null);
   const [transitionStage, setTransitionStage] = useState("idle");
+  const [transitionEnabled, setTransitionEnabled] = useState(false);
 
   useEffect(() => {
     const handleHashChange = () => {
       const nextPath = window.location.hash.slice(1) || "/";
       if (nextPath === currentPath && !pendingPath) return;
 
+      const shouldAnimate = isCoreRoute(currentPath) && isCoreRoute(nextPath);
+
+      if (!shouldAnimate) {
+        setTransitionEnabled(false);
+        setPendingPath(null);
+        setTransitionStage("idle");
+        setCurrentPath(nextPath);
+        return;
+      }
+
+      setTransitionEnabled(true);
       setPendingPath(nextPath);
       setTransitionStage("exit");
     };
@@ -87,13 +115,14 @@ const Router = () => {
   return {
     currentPath,
     transitionStage,
+    transitionEnabled,
     isTransitioning: transitionStage !== "idle",
   };
 };
 
 // Route Matching Component
 const Routes = () => {
-  const { currentPath, transitionStage } = useRoute();
+  const { currentPath, transitionStage, transitionEnabled } = useRoute();
   const { isAuthenticated, initializing } = useAuth();
 
   // Show full-page loader while checking stored token
@@ -139,18 +168,13 @@ const Routes = () => {
   }
 
   return (
-    <>
-      <div className={`route-transition ${transitionStage}`} aria-hidden="true">
-        <span className="route-transition__bar" />
-        <span className="route-transition__sweep" />
+    <div
+      className={`page-shell ${transitionEnabled ? "transition-on" : "transition-off"} stage-${transitionStage}`}
+    >
+      <div className="page-shell__inner">
+        <Component />
       </div>
-
-      <div className={`page-shell stage-${transitionStage}`}>
-        <div className="page-shell__inner">
-          <Component />
-        </div>
-      </div>
-    </>
+    </div>
   );
 };
 
