@@ -10,6 +10,7 @@ const Button = ({
   disabled = false,
   className = "",
   loading = false,
+  loadingText = "",
 }) => {
   return (
     <button
@@ -18,7 +19,14 @@ const Button = ({
       onClick={onClick}
       disabled={disabled || loading}
     >
-      {loading ? <Spinner size={16} /> : children}
+      {loading ? (
+        <>
+          <Spinner size={16} />
+          {loadingText ? <span>{loadingText}</span> : null}
+        </>
+      ) : (
+        children
+      )}
     </button>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext, createContext } from "react";
 import { AuthProvider, useAuth } from "./Contexts/AuthContext";
 import { ToastProvider } from "./Contexts/ToastContext";
 import Spinner from "./Components/Spinner";
@@ -23,32 +23,77 @@ export const useNavigate = () => {
   };
 };
 
+const RouteContext = createContext({
+  currentPath: window.location.hash.slice(1) || "/",
+  transitionStage: "idle",
+  isTransitioning: false,
+});
+
+const useRoute = () => useContext(RouteContext);
+
 export const useParams = () => {
-  const hash = window.location.hash.slice(1);
-  const parts = hash.split("/");
+  const { currentPath } = useRoute();
+  const path = currentPath || window.location.hash.slice(1) || "/";
+  const parts = path.split("/");
   return { id: parts[parts.length - 1] };
 };
 
 // Router Component
+const ROUTE_EXIT_MS = 260;
+const ROUTE_ENTER_MS = 520;
+
 const Router = () => {
   const [currentPath, setCurrentPath] = useState(
     window.location.hash.slice(1) || "/",
   );
+  const [pendingPath, setPendingPath] = useState(null);
+  const [transitionStage, setTransitionStage] = useState("idle");
 
   useEffect(() => {
     const handleHashChange = () => {
-      setCurrentPath(window.location.hash.slice(1) || "/");
+      const nextPath = window.location.hash.slice(1) || "/";
+      if (nextPath === currentPath && !pendingPath) return;
+
+      setPendingPath(nextPath);
+      setTransitionStage("exit");
     };
+
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
-  }, []);
+  }, [currentPath, pendingPath]);
 
-  return currentPath;
+  useEffect(() => {
+    if (transitionStage !== "exit") return;
+
+    const exitTimer = window.setTimeout(() => {
+      setCurrentPath(pendingPath || currentPath);
+      setTransitionStage("enter");
+    }, ROUTE_EXIT_MS);
+
+    return () => window.clearTimeout(exitTimer);
+  }, [transitionStage, pendingPath, currentPath]);
+
+  useEffect(() => {
+    if (transitionStage !== "enter") return;
+
+    const enterTimer = window.setTimeout(() => {
+      setTransitionStage("idle");
+      setPendingPath(null);
+    }, ROUTE_ENTER_MS);
+
+    return () => window.clearTimeout(enterTimer);
+  }, [transitionStage]);
+
+  return {
+    currentPath,
+    transitionStage,
+    isTransitioning: transitionStage !== "idle",
+  };
 };
 
 // Route Matching Component
 const Routes = () => {
-  const currentPath = Router();
+  const { currentPath, transitionStage } = useRoute();
   const { isAuthenticated, initializing } = useAuth();
 
   // Show full-page loader while checking stored token
@@ -56,50 +101,70 @@ const Routes = () => {
     return (
       <div className="page-loader">
         <Spinner size={48} />
-        <p>Loading…</p>
+        <p>Preparing your dashboard...</p>
       </div>
     );
   }
 
-  // Route matching logic
+  let Component;
+
   if (currentPath === "/" || currentPath === "") {
-    return <LandingPage />;
+    Component = LandingPage;
   } else if (currentPath === "/login") {
-    return <LoginPage />;
+    Component = LoginPage;
   } else if (currentPath === "/signup") {
-    return <SignupPage />;
+    Component = SignupPage;
   } else if (currentPath === "/signup/confirm") {
-    return <SignupConfirmPage />;
+    Component = SignupConfirmPage;
   } else if (currentPath === "/forgot-password") {
-    return <ForgotPasswordPage />;
+    Component = ForgotPasswordPage;
   } else if (currentPath === "/forgot-otp") {
-    return <ForgotOtpPage />;
+    Component = ForgotOtpPage;
   } else if (currentPath === "/forgot-reset") {
-    return <ForgotResetPage />;
+    Component = ForgotResetPage;
   } else if (currentPath === "/dashboard") {
-    return isAuthenticated ? <DashboardPage /> : <LoginPage />;
+    Component = isAuthenticated ? DashboardPage : LoginPage;
   } else if (currentPath === "/upload") {
-    return isAuthenticated ? <UploadPage /> : <LoginPage />;
+    Component = isAuthenticated ? UploadPage : LoginPage;
   } else if (currentPath === "/results") {
-    return isAuthenticated ? <ResultsPage /> : <LoginPage />;
+    Component = isAuthenticated ? ResultsPage : LoginPage;
   } else if (currentPath === "/history") {
-    return isAuthenticated ? <HistoryPage /> : <LoginPage />;
+    Component = isAuthenticated ? HistoryPage : LoginPage;
   } else if (currentPath.startsWith("/report/")) {
-    return isAuthenticated ? <ReportDetailsPage /> : <LoginPage />;
+    Component = isAuthenticated ? ReportDetailsPage : LoginPage;
   } else if (currentPath === "/profile") {
-    return isAuthenticated ? <ProfilePage /> : <LoginPage />;
+    Component = isAuthenticated ? ProfilePage : LoginPage;
   } else {
-    return <LandingPage />;
+    Component = LandingPage;
   }
+
+  return (
+    <>
+      <div className={`route-transition ${transitionStage}`} aria-hidden="true">
+        <span className="route-transition__bar" />
+        <span className="route-transition__sweep" />
+      </div>
+
+      <div className={`page-shell stage-${transitionStage}`}>
+        <div className="page-shell__inner">
+          <Component />
+        </div>
+      </div>
+    </>
+  );
 };
 
 // Main App Component
 const App = () => {
+  const routeState = Router();
+
   return (
     <AuthProvider>
       <ToastProvider>
         <div className="app">
-          <Routes />
+          <RouteContext.Provider value={routeState}>
+            <Routes />
+          </RouteContext.Provider>
         </div>
       </ToastProvider>
     </AuthProvider>

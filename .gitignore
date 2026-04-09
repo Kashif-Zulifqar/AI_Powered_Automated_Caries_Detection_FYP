@@ -31,7 +31,7 @@ __pycache__/
 
 # Virtual environment
 venv/
-.env/
+Backend/.env/
 
 # Flask
 instance/
