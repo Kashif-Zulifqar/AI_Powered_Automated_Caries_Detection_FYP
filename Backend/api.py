@@ -13,6 +13,10 @@ from bson import ObjectId
 from datetime import datetime
 import random
 import logging
+from flask import Blueprint, request, jsonify
+import numpy as np
+import cv2
+from model_loader import model
 
 api = Blueprint("api", __name__, url_prefix="/api")
 log = logging.getLogger("dentalai.api")
@@ -208,3 +212,34 @@ def upload_scan():
         "severity": severity,
         "confidence": confidence,
     }), 201
+
+
+# ───predict route------------------
+api = Blueprint('api', __name__)
+
+@api.route('/predict', methods=['POST'])
+def predict():
+    file = request.files['image']
+
+    # Convert image to numpy
+    img = np.frombuffer(file.read(), np.uint8)
+    img = cv2.imdecode(img, cv2.IMREAD_COLOR)
+
+    # Run model
+    results = model(img)
+
+    detections = []
+
+    for r in results:
+        boxes = r.boxes.xyxy.cpu().numpy()
+        scores = r.boxes.conf.cpu().numpy()
+
+        for box, score in zip(boxes, scores):
+            x1, y1, x2, y2 = box
+
+            detections.append({
+                "bbox": [int(x1), int(y1), int(x2), int(y2)],
+                "confidence": float(score)
+            })
+
+    return jsonify({"detections": detections})

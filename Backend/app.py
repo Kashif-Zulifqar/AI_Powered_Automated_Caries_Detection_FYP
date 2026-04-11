@@ -4,11 +4,16 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 from auth import auth
 from api import api
+from ultralytics import YOLO
 
 load_dotenv(override=True)
 
 def create_app():
     app = Flask(__name__)
+
+    @app.route('/')
+    def home():
+        return "Model Loaded Successfully!"
 
     # CORS: allow all localhost/127.0.0.1 and any Vite port (5173–5180)
     FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://127.0.0.1:5173")
