@@ -14,6 +14,7 @@ const UploadPage = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [result, setResult] = useState(null);
   //const { authFetch } = useAuth();
   const { addToast } = useToast();
   //const navigate = useNavigate();
@@ -69,6 +70,7 @@ const UploadPage = () => {
         "http://127.0.0.1:5000/predict",
         formData
       );
+      setResult(res.data);
   
       clearInterval(interval);
       setProgress(100);
@@ -188,6 +190,20 @@ const UploadPage = () => {
           >
             {uploading ? "Analyzing..." : "Analyze Now"}
           </Button>
+                  {result && (
+            <div className="result-section">
+              <h3>Detection Results</h3>
+
+              <p>Total Detections: {result.detections.length}</p>
+
+              {result.detections.map((det, index) => (
+                <div key={index} style={{ marginBottom: "10px" }}>
+                  <p>Box: {det.bbox.join(", ")}</p>
+                  <p>Confidence: {(det.confidence * 100).toFixed(2)}%</p>
+                </div>
+              ))}
+            </div>
+        )}
         </Card>
 
         <div className="upload-tips">
