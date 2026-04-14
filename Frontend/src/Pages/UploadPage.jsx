@@ -1,21 +1,23 @@
-import React, { useState } from "react";
-import { useNavigate } from "../App.jsx";
+import React, { useState, useRef } from "react";
+//import { useNavigate } from "../App.jsx";
 import { Upload, Camera, FileText } from "lucide-react";
-import { useAuth } from "../Contexts/AuthContext";
+//import { useAuth } from "../Contexts/AuthContext";
 import Header from "../Components/Header.jsx";
 import Card from "../Components/Card.jsx";
 import { Button } from "../Components/Button.jsx";
 import { useToast } from "../Contexts/ToastContext";
 import "./Pages.css";
+import axios from "axios";
 
 const UploadPage = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
-  const { authFetch } = useAuth();
+  //const { authFetch } = useAuth();
   const { addToast } = useToast();
-  const navigate = useNavigate();
+  //const navigate = useNavigate();
+  const fileInputRef = useRef(null);
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -49,41 +51,48 @@ const UploadPage = () => {
       addToast("Please select a file first", "error");
       return;
     }
-
+  
     setUploading(true);
     setProgress(0);
-
-    // Simulate progress while uploading
+  
     const interval = setInterval(() => {
       setProgress((prev) => (prev >= 90 ? 90 : prev + 10));
     }, 200);
-
+  
     try {
       const formData = new FormData();
-      formData.append("file", selectedFile);
-
-      const res = await authFetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
+  
+      // ⚠️ IMPORTANT: backend me key "image" hai
+      formData.append("image", selectedFile);
+  
+      const res = await axios.post(
+        "http://127.0.0.1:5000/predict",
+        formData
+      );
+  
       clearInterval(interval);
       setProgress(100);
-
-      const data = await res.json();
-      if (res.ok) {
-        addToast("Analysis complete!", "success");
-        setTimeout(() => {
-          setUploading(false);
-          navigate(`/report/${data.reportId}`);
-        }, 500);
-      } else {
+  
+      console.log("AI Result:", res.data);
+  
+      addToast("Analysis complete!", "success");
+  
+      setTimeout(() => {
         setUploading(false);
-        addToast(data.error || "Upload failed", "error");
-      }
+  
+        // 👉 temporary: just log
+        console.log(res.data);
+  
+        // 👉 next step me yahan navigate karenge
+        // navigate("/report", { state: res.data });
+  
+      }, 500);
+  
     } catch (err) {
       clearInterval(interval);
       setUploading(false);
-      addToast(err.message || "Upload failed", "error");
+      console.error(err);
+      addToast("Detection failed", "error");
     }
   };
 
@@ -122,13 +131,18 @@ const UploadPage = () => {
                 <h3>Drag & Drop Image Here</h3>
                 <p>or</p>
                 <label className="file-input-label">
-                  <input
+                 <input
                     type="file"
                     accept="image/*"
+                    ref={fileInputRef}
                     onChange={handleFileSelect}
-                    className="file-input"
+                    style={{ display: "none" }}
                   />
-                  <Button variant="outline" as="span">
+
+                  <Button
+                    variant="outline"
+                    onClick={() => fileInputRef.current.click()}
+                  >
                     Select from Gallery
                   </Button>
                 </label>
@@ -137,10 +151,22 @@ const UploadPage = () => {
           </div>
 
           <div className="upload-options">
-            <button className="option-button">
-              <Camera size={20} />
-              <span>Capture from Webcam</span>
-            </button>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleFileSelect}
+                style={{ display: "none" }}
+                id="cameraInput"
+              />
+
+              <button
+                className="option-button"
+                onClick={() => document.getElementById("cameraInput").click()}
+              >
+                <Camera size={20} />
+                <span>Capture from Webcam</span>
+              </button>
           </div>
 
           {uploading && (
