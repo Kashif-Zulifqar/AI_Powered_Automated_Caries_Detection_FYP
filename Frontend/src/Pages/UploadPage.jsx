@@ -9,12 +9,16 @@ import { useToast } from "../Contexts/ToastContext";
 import "./Pages.css";
 import axios from "axios";
 
+
 const UploadPage = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const canvasRef = useRef(null);
+  const imageRef = useRef(null);
   //const { authFetch } = useAuth();
   const { addToast } = useToast();
   //const navigate = useNavigate();
@@ -35,14 +39,62 @@ const UploadPage = () => {
     const files = e.dataTransfer.files;
     if (files.length > 0) {
       setSelectedFile(files[0]);
+      setPreview(URL.createObjectURL(files[0]));//preview ke liye URL.createObjectURL ka use kiya hai
       addToast("File selected successfully", "success");
     }
+  };
+
+  const drawBoxes = (detections) => {
+    const canvas = canvasRef.current;
+    const image = imageRef.current;
+  
+    const ctx = canvas.getContext("2d");
+  
+    // Actual image size
+    const imgWidth = image.naturalWidth;
+    const imgHeight = image.naturalHeight;
+  
+    // Displayed image size
+    const displayWidth = image.clientWidth;
+    const displayHeight = image.clientHeight;
+  
+    // Scale factors
+    const scaleX = displayWidth / imgWidth;
+    const scaleY = displayHeight / imgHeight;
+  
+    canvas.width = displayWidth;
+    canvas.height = displayHeight;
+  
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+    detections.forEach((det) => {
+      let [x1, y1, x2, y2] = det.bbox;
+  
+      // 🔥 SCALE FIX
+      x1 *= scaleX;
+      x2 *= scaleX;
+      y1 *= scaleY;
+      y2 *= scaleY;
+  
+      ctx.strokeStyle = "red";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+  
+      ctx.fillStyle = "red";
+      ctx.font = "14px Arial";
+      ctx.fillText(
+        (det.confidence * 100).toFixed(1) + "%",
+        x1,
+        y1 - 5
+      );
+    });
   };
 
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
       setSelectedFile(file);
+      setPreview(URL.createObjectURL(file));
       addToast("File selected successfully", "success");
     }
   };
@@ -71,6 +123,10 @@ const UploadPage = () => {
         formData
       );
       setResult(res.data);
+
+      setTimeout(() => {
+        drawBoxes(res.data.detections);
+      }, 200);
   
       clearInterval(interval);
       setProgress(100);
@@ -190,6 +246,32 @@ const UploadPage = () => {
           >
             {uploading ? "Analyzing..." : "Analyze Now"}
           </Button>
+
+          {preview && (
+            <div style={{ position: "relative", marginTop: "20px" }}>
+              
+              <img
+                ref={imageRef}
+                src={preview}
+                alt="preview"
+                style={{ width: "100%", maxWidth: "500px" }}
+                onLoad={() => {
+                  if (result) drawBoxes(result.detections);
+                }}
+              />
+
+              <canvas
+                ref={canvasRef}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                }}
+              ></canvas>
+
+            </div>
+          )}
+
                   {result && (
             <div className="result-section">
               <h3>Detection Results</h3>
