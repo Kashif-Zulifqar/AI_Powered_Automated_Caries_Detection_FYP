@@ -4,7 +4,6 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 from auth import auth
 from api import api
-from ultralytics import YOLO
 
 load_dotenv(override=True)
 

@@ -13,10 +13,7 @@ from bson import ObjectId
 from datetime import datetime
 import random
 import logging
-from flask import Blueprint, request, jsonify
-import numpy as np
-import cv2
-from model_loader import model
+import importlib
 
 api = Blueprint("api", __name__, url_prefix="/api")
 log = logging.getLogger("dentalai.api")
@@ -214,16 +211,32 @@ def upload_scan():
     }), 201
 
 
-# ───predict route------------------
-api = Blueprint('api', __name__)
+# ─── Predict Route ───────────────────────────────────────────────────────────
 
 @api.route('/predict', methods=['POST'])
 def predict():
+    if 'image' not in request.files:
+        return jsonify({"error": "No image uploaded. Use form-data key 'image'."}), 400
+
     file = request.files['image']
+
+    try:
+        np = importlib.import_module("numpy")
+        cv2 = importlib.import_module("cv2")
+        from model_loader import model
+    except Exception as exc:
+        log.exception("Predict dependencies unavailable")
+        return jsonify({
+            "error": "AI dependencies are missing. Install numpy, opencv-python and ultralytics.",
+            "details": str(exc),
+        }), 500
 
     # Convert image to numpy
     img = np.frombuffer(file.read(), np.uint8)
     img = cv2.imdecode(img, cv2.IMREAD_COLOR)
+
+    if img is None:
+        return jsonify({"error": "Invalid or unreadable image file."}), 400
 
     # Run model
     results = model(img)

@@ -52,44 +52,42 @@ const UploadPage = () => {
       addToast("Please select a file first", "error");
       return;
     }
-  
+
     setUploading(true);
     setProgress(0);
-  
+
     const interval = setInterval(() => {
       setProgress((prev) => (prev >= 90 ? 90 : prev + 10));
     }, 200);
-  
+
     try {
       const formData = new FormData();
-  
+
       // ⚠️ IMPORTANT: backend me key "image" hai
       formData.append("image", selectedFile);
-  
+
       const res = await axios.post(
-        "http://127.0.0.1:5000/predict",
-        formData
+        "http://127.0.0.1:5000/api/predict",
+        formData,
       );
       setResult(res.data);
-  
+
       clearInterval(interval);
       setProgress(100);
-  
+
       console.log("AI Result:", res.data);
-  
+
       addToast("Analysis complete!", "success");
-  
+
       setTimeout(() => {
         setUploading(false);
-  
+
         // 👉 temporary: just log
         console.log(res.data);
-  
+
         // 👉 next step me yahan navigate karenge
         // navigate("/report", { state: res.data });
-  
       }, 500);
-  
     } catch (err) {
       clearInterval(interval);
       setUploading(false);
@@ -133,7 +131,7 @@ const UploadPage = () => {
                 <h3>Drag & Drop Image Here</h3>
                 <p>or</p>
                 <label className="file-input-label">
-                 <input
+                  <input
                     type="file"
                     accept="image/*"
                     ref={fileInputRef}
@@ -153,22 +151,22 @@ const UploadPage = () => {
           </div>
 
           <div className="upload-options">
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleFileSelect}
-                style={{ display: "none" }}
-                id="cameraInput"
-              />
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleFileSelect}
+              style={{ display: "none" }}
+              id="cameraInput"
+            />
 
-              <button
-                className="option-button"
-                onClick={() => document.getElementById("cameraInput").click()}
-              >
-                <Camera size={20} />
-                <span>Capture from Webcam</span>
-              </button>
+            <button
+              className="option-button"
+              onClick={() => document.getElementById("cameraInput").click()}
+            >
+              <Camera size={20} />
+              <span>Capture from Webcam</span>
+            </button>
           </div>
 
           {uploading && (
@@ -190,7 +188,7 @@ const UploadPage = () => {
           >
             {uploading ? "Analyzing..." : "Analyze Now"}
           </Button>
-                  {result && (
+          {result && (
             <div className="result-section">
               <h3>Detection Results</h3>
 
@@ -203,7 +201,7 @@ const UploadPage = () => {
                 </div>
               ))}
             </div>
-        )}
+          )}
         </Card>
 
         <div className="upload-tips">
