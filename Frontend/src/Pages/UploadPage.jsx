@@ -6,7 +6,7 @@ import Header from "../Components/Header.jsx";
 import Card from "../Components/Card.jsx";
 import { Button } from "../Components/Button.jsx";
 import { useToast } from "../Contexts/ToastContext";
-import "./Pages.css";
+import "./report.css";
 import axios from "axios";
 
 
@@ -19,6 +19,7 @@ const UploadPage = () => {
   const [preview, setPreview] = useState(null);
   const canvasRef = useRef(null);
   const imageRef = useRef(null);
+  const [reportText, setReportText] = useState("");
   //const { authFetch } = useAuth();
   const { addToast } = useToast();
   //const navigate = useNavigate();
@@ -99,6 +100,8 @@ const UploadPage = () => {
     }
   };
 
+  
+
   const handleAnalyze = async () => {
     if (!selectedFile) {
       addToast("Please select a file first", "error");
@@ -119,10 +122,12 @@ const UploadPage = () => {
       formData.append("image", selectedFile);
   
       const res = await axios.post(
-        "http://127.0.0.1:5000/predict",
+        "http://127.0.0.1:5000/api/predict",
         formData
       );
       setResult(res.data);
+      setReportText(res.data.report);
+      
 
       setTimeout(() => {
         drawBoxes(res.data.detections);
@@ -151,6 +156,21 @@ const UploadPage = () => {
       setUploading(false);
       console.error(err);
       addToast("Detection failed", "error");
+    }
+  };
+  
+  const handleDownloadPDF = async () => {
+    try {
+      await axios.post(
+        "http://127.0.0.1:5000/api/generate-pdf",
+        { report: reportText }
+      );
+  
+      window.open("http://127.0.0.1:5000/api/generate-pdf");
+  
+    } catch (err) {
+      console.error(err);
+      addToast("PDF generation failed", "error");
     }
   };
 
@@ -272,9 +292,13 @@ const UploadPage = () => {
             </div>
           )}
 
-                  {result && (
+          {result && (
             <div className="result-section">
               <h3>Detection Results</h3>
+
+              <Button onClick={handleDownloadPDF}>
+                 Download PDF
+              </Button>
 
               <p>Total Detections: {result.detections.length}</p>
 
@@ -286,7 +310,16 @@ const UploadPage = () => {
               ))}
             </div>
         )}
+        {reportText && (
+            <div className="medical-report-box">
+              <h2>📄 AI Medical Report</h2>
+              <pre className="report-text">
+                {reportText}
+              </pre>
+            </div>
+          )}
         </Card>
+        
 
         <div className="upload-tips">
           <h3>📋 Tips for Best Results</h3>
