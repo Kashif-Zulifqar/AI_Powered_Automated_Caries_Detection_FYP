@@ -414,6 +414,25 @@ html {
 .history-actions {
   display: flex;
   gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.report-action-btn {
+  padding: 0.38rem 0.62rem !important;
+  font-size: 0.78rem !important;
+  border-radius: 6px !important;
+  min-height: 32px;
+  line-height: 1;
+}
+
+.delete-action-btn {
+  border-color: #dc2626 !important;
+  color: #dc2626 !important;
+}
+
+.delete-action-btn:hover {
+  background: #dc2626 !important;
+  color: #fff !important;
 }
 
 /* ============================================
@@ -1096,6 +1115,250 @@ html {
   color: #c62828 !important;
   border-color: #c62828 !important;
   width: 100%;
+}
+
+@media (max-width: 1024px) {
+  .hero {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+    padding: 3rem 1.25rem;
+  }
+
+  .features-grid,
+  .testimonials-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+  }
+
+  .dashboard-main,
+  .report-content,
+  .profile-content,
+  .results-grid {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  .dashboard-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .steps {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .step-arrow {
+    transform: rotate(90deg);
+    text-align: center;
+  }
+}
+
+@media (max-width: 768px) {
+  .landing-page,
+  .auth-page,
+  .dashboard-page,
+  .upload-page,
+  .history-page,
+  .profile-page,
+  .report-details-page,
+  .results-page {
+    background-attachment: scroll;
+  }
+
+  .hero-content h1,
+  .features h2,
+  .how-it-works h2,
+  .testimonials h2,
+  .dashboard-header h1,
+  .upload-container h1,
+  .history-header h1,
+  .profile-container h1,
+  .results-container h1,
+  .report-header h1,
+  .auth-card h1 {
+    font-size: 1.6rem;
+  }
+
+  .hero,
+  .features,
+  .how-it-works,
+  .testimonials,
+  .auth-container,
+  .dashboard-container,
+  .upload-container,
+  .history-container,
+  .profile-container,
+  .results-container,
+  .report-details-container {
+    padding: 1rem;
+  }
+
+  .hero-buttons,
+  .profile-actions,
+  .results-actions {
+    flex-direction: column;
+  }
+
+  .features-grid,
+  .testimonials-grid,
+  .dashboard-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-card,
+  .upload-card,
+  .quick-action-card,
+  .recent-reports-section,
+  .report-findings,
+  .report-image-section,
+  .metrics-card,
+  .profile-card,
+  .security-card,
+  .danger-zone,
+  .results-image-card,
+  .detail-card {
+    padding: 1rem;
+  }
+
+  .dashboard-header,
+  .history-header,
+  .report-header,
+  .profile-header,
+  .section-header,
+  .history-card-footer,
+  .metric-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .report-meta,
+  .history-actions,
+  .report-stats {
+    width: 100%;
+  }
+
+  .report-meta,
+  .history-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .report-item {
+    align-items: flex-start;
+  }
+
+  .report-info {
+    width: 100%;
+  }
+
+  .report-item,
+  .history-card {
+    width: 100%;
+  }
+
+  .history-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .upload-dropzone {
+    padding: 1.5rem 1rem;
+  }
+
+  .upload-options {
+    margin: 1rem 0;
+  }
+
+  .option-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .report-image-preview,
+  .results-image-preview {
+    min-height: 220px;
+    padding: 1rem;
+  }
+
+  .image-placeholder {
+    font-size: 5rem;
+  }
+
+  .footer-container {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-content h1,
+  .features h2,
+  .how-it-works h2,
+  .testimonials h2,
+  .dashboard-header h1,
+  .upload-container h1,
+  .history-header h1,
+  .profile-container h1,
+  .results-container h1,
+  .report-header h1,
+  .auth-card h1 {
+    font-size: 1.35rem;
+  }
+
+  .hero-subtitle,
+  .dashboard-header p,
+  .upload-subtitle,
+  .auth-subtitle {
+    font-size: 0.95rem;
+  }
+
+  .report-info h4,
+  .history-card-body h3,
+  .quick-action-card h2,
+  .section-header h2 {
+    font-size: 1.1rem;
+  }
+
+  .stat-content h3 {
+    font-size: 1.5rem;
+  }
+
+  .btn {
+    width: 100%;
+  }
+
+  .history-actions .btn,
+  .report-meta .btn {
+    width: auto;
+    flex: 0 0 auto;
+  }
+
+  .report-meta {
+    width: 100%;
+    gap: 0.4rem;
+  }
+
+  .report-meta .severity-badge {
+    font-size: 0.72rem;
+    padding: 0.18rem 0.45rem;
+  }
+
+  .report-action-btn {
+    padding: 0.34rem 0.54rem !important;
+    font-size: 0.72rem !important;
+    min-height: 30px;
+  }
+
+  .report-date,
+  .history-id,
+  .history-summary,
+  .report-info p,
+  .metric-label,
+  .metric-value {
+    font-size: 0.86rem;
+  }
 }
 
 .delete-button:hover {

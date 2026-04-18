@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "../App";
-import { FileText } from "lucide-react";
+import { FileText, Trash2 } from "lucide-react";
 import { useAuth } from "../Contexts/AuthContext";
 import Header from "../Components/Header.jsx";
 import "./Pages.css";
@@ -8,16 +8,44 @@ import Card from "../Components/Card.jsx";
 import { Button } from "../Components/Button.jsx";
 import Spinner from "../Components/Spinner.jsx";
 import { downloadReportPdf } from "../utils/reportPdf";
+import { useToast } from "../Contexts/ToastContext";
 
 const HistoryPage = () => {
   const navigate = useNavigate();
   const { authFetch } = useAuth();
+  const { addToast } = useToast();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState(null);
 
   const handleDownload = (report, event) => {
     event.stopPropagation();
     downloadReportPdf(report);
+  };
+
+  const handleDelete = async (reportId, event) => {
+    event.stopPropagation();
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this report?",
+    );
+    if (!confirmed) return;
+
+    setDeletingId(reportId);
+    try {
+      const res = await authFetch(`/api/reports/${reportId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to delete report");
+      }
+      setReports((prev) => prev.filter((r) => r.id !== reportId));
+      addToast("Report deleted", "success");
+    } catch (err) {
+      addToast(err.message || "Failed to delete report", "error");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   useEffect(() => {
@@ -94,6 +122,7 @@ const HistoryPage = () => {
                   <div className="history-actions">
                     <Button
                       variant="outline"
+                      className="report-action-btn"
                       onClick={(event) => {
                         event.stopPropagation();
                         navigate(`/report/${report.id}`);
@@ -103,9 +132,19 @@ const HistoryPage = () => {
                     </Button>
                     <Button
                       variant="outline"
+                      className="report-action-btn"
                       onClick={(event) => handleDownload(report, event)}
                     >
                       Download PDF
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="delete-action-btn report-action-btn"
+                      onClick={(event) => handleDelete(report.id, event)}
+                      disabled={deletingId === report.id}
+                    >
+                      <Trash2 size={16} />
+                      {deletingId === report.id ? "Deleting..." : "Delete"}
                     </Button>
                   </div>
                 </div>

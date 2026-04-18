@@ -137,6 +137,25 @@ def get_report(report_id):
     }), 200
 
 
+@api.delete("/reports/<report_id>")
+@login_required
+def delete_report(report_id):
+    """Delete a report owned by the authenticated user."""
+    email = g.current_user["email"]
+
+    try:
+        oid = ObjectId(report_id)
+    except Exception:
+        return jsonify({"error": "Invalid report ID"}), 400
+
+    deleted = scans.delete_one({"_id": oid, "user_email": email})
+    if deleted.deleted_count == 0:
+        return jsonify({"error": "Report not found"}), 404
+
+    log.info(f"Report deleted by {email}: {report_id}")
+    return jsonify({"message": "Report deleted successfully"}), 200
+
+
 # ─── Upload + Analyze ────────────────────────────────────────────────────────
 
 @api.post("/upload")

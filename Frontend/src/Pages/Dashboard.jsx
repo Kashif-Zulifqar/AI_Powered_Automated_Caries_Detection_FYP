@@ -1,37 +1,70 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "../App";
-import { Bell, Upload, FileText } from "lucide-react";
+import { Bell, Upload, FileText, Trash2 } from "lucide-react";
 import { useAuth } from "../Contexts/AuthContext";
 import Header from "../Components/Header.jsx";
 import Card from "../Components/Card.jsx";
 import { Button } from "../Components/Button.jsx";
 import Spinner from "../Components/Spinner.jsx";
 import { downloadReportPdf } from "../utils/reportPdf";
+import { useToast } from "../Contexts/ToastContext";
 import "./Pages.css";
 
 const DashboardPage = () => {
   const { user, authFetch } = useAuth();
+  const { addToast } = useToast();
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
+  const loadStats = useCallback(
+    async (cancelledRef) => {
       try {
         const res = await authFetch("/api/dashboard-stats");
-        if (!cancelled && res.ok) {
+        if ((!cancelledRef || !cancelledRef.current) && res.ok) {
           setStats(await res.json());
         }
       } catch {
         /* ignore */
       }
-      if (!cancelled) setLoading(false);
-    })();
+      if (!cancelledRef || !cancelledRef.current) setLoading(false);
+    },
+    [authFetch],
+  );
+
+  useEffect(() => {
+    const cancelledRef = { current: false };
+    loadStats(cancelledRef);
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
     };
-  }, [authFetch]);
+  }, [loadStats]);
+
+  const handleDelete = async (reportId, event) => {
+    event.stopPropagation();
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this report?",
+    );
+    if (!confirmed) return;
+
+    setDeletingId(reportId);
+    try {
+      const res = await authFetch(`/api/reports/${reportId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to delete report");
+      }
+      addToast("Report deleted", "success");
+      await loadStats();
+    } catch (err) {
+      addToast(err.message || "Failed to delete report", "error");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const recentReports = stats?.recentReports || [];
 
@@ -119,6 +152,7 @@ const DashboardPage = () => {
                           </span>
                           <Button
                             variant="outline"
+                            className="report-action-btn"
                             onClick={(event) => {
                               event.stopPropagation();
                               downloadReportPdf({
@@ -128,6 +162,17 @@ const DashboardPage = () => {
                             }}
                           >
                             Download
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="delete-action-btn"
+                            onClick={(event) => handleDelete(report.id, event)}
+                            disabled={deletingId === report.id}
+                          >
+                            <Trash2 size={16} />
+                            {deletingId === report.id
+                              ? "Deleting..."
+                              : "Delete"}
                           </Button>
                         </div>
                       </Card>

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { LogOut } from "lucide-react";
+import { useEffect, useState } from "react";
+import { LogOut, Menu, X } from "lucide-react";
 import "./Components.css";
 import { useAuth } from "../Contexts/AuthContext";
 import { useToast } from "../Contexts/ToastContext";
@@ -14,9 +14,29 @@ const Header = ({ isLanding = false, minimal = false }) => {
 
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [currentPath, setCurrentPath] = useState(
+    window.location.hash.slice(1) || "/",
+  );
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      setCurrentPath(window.location.hash.slice(1) || "/");
+      setMobileOpen(false);
+    };
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
+
+  const normalizedPath = currentPath.split("?")[0];
+  const activePath = normalizedPath.startsWith("/report/")
+    ? "/history"
+    : normalizedPath;
+  const isActive = (path) => activePath === path;
 
   const handleLogoClick = () => {
     navigate("/");
+    setMobileOpen(false);
   };
 
   const handleConfirmLogout = async () => {
@@ -45,40 +65,63 @@ const Header = ({ isLanding = false, minimal = false }) => {
             🦷 DentalAI
           </div>
 
-          <nav className="nav">
+          {!minimal && (
+            <button
+              type="button"
+              className="menu-toggle"
+              aria-label={
+                mobileOpen ? "Close navigation menu" : "Open navigation menu"
+              }
+              aria-expanded={mobileOpen}
+              onClick={() => setMobileOpen((prev) => !prev)}
+            >
+              {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+          )}
+
+          <nav className={`nav ${mobileOpen ? "nav-open" : ""}`}>
             {minimal ? null : isLanding ? (
               <>
                 <a href="#features">Features</a>
                 <a href="#how-it-works">How It Works</a>
                 <a href="#testimonials">Testimonials</a>
-                <Button variant="outline" onClick={() => navigate("/login")}>
+                <Button
+                  variant="outline"
+                  className={isActive("/login") ? "nav-btn-active" : ""}
+                  onClick={() => navigate("/login")}
+                >
                   Login
                 </Button>
-                <Button onClick={() => navigate("/signup")}>Get Started</Button>
+                <Button
+                  className={isActive("/signup") ? "nav-btn-active" : ""}
+                  onClick={() => navigate("/signup")}
+                >
+                  Get Started
+                </Button>
               </>
             ) : isAuthenticated ? (
               <>
                 <button
                   onClick={() => navigate("/dashboard")}
-                  className="nav-link"
+                  className={`nav-link ${isActive("/dashboard") ? "active" : ""}`}
                 >
                   Dashboard
                 </button>
                 <button
                   onClick={() => navigate("/upload")}
-                  className="nav-link"
+                  className={`nav-link ${isActive("/upload") ? "active" : ""}`}
                 >
                   Upload
                 </button>
                 <button
                   onClick={() => navigate("/history")}
-                  className="nav-link"
+                  className={`nav-link ${isActive("/history") ? "active" : ""}`}
                 >
                   Reports
                 </button>
                 <button
                   onClick={() => navigate("/profile")}
-                  className="nav-link"
+                  className={`nav-link ${isActive("/profile") ? "active" : ""}`}
                 >
                   Profile
                 </button>
@@ -92,10 +135,19 @@ const Header = ({ isLanding = false, minimal = false }) => {
               </>
             ) : (
               <>
-                <Button variant="outline" onClick={() => navigate("/login")}>
+                <Button
+                  variant="outline"
+                  className={isActive("/login") ? "nav-btn-active" : ""}
+                  onClick={() => navigate("/login")}
+                >
                   Login
                 </Button>
-                <Button onClick={() => navigate("/signup")}>Sign Up</Button>
+                <Button
+                  className={isActive("/signup") ? "nav-btn-active" : ""}
+                  onClick={() => navigate("/signup")}
+                >
+                  Sign Up
+                </Button>
               </>
             )}
           </nav>
