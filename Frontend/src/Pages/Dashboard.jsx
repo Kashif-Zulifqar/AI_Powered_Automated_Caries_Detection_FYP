@@ -6,6 +6,7 @@ import Header from "../Components/Header.jsx";
 import Card from "../Components/Card.jsx";
 import { Button } from "../Components/Button.jsx";
 import Spinner from "../Components/Spinner.jsx";
+import Modal from "../Components/Modal.jsx";
 import { downloadReportPdf } from "../utils/reportPdf";
 import { useToast } from "../Contexts/ToastContext";
 import "./Pages.css";
@@ -17,6 +18,7 @@ const DashboardPage = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
 
   const loadStats = useCallback(
     async (cancelledRef) => {
@@ -41,13 +43,10 @@ const DashboardPage = () => {
     };
   }, [loadStats]);
 
-  const handleDelete = async (reportId, event) => {
-    event.stopPropagation();
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this report?",
-    );
-    if (!confirmed) return;
+  const confirmDelete = async () => {
+    if (!pendingDeleteId) return;
 
+    const reportId = pendingDeleteId;
     setDeletingId(reportId);
     try {
       const res = await authFetch(`/api/reports/${reportId}`, {
@@ -63,6 +62,7 @@ const DashboardPage = () => {
       addToast(err.message || "Failed to delete report", "error");
     } finally {
       setDeletingId(null);
+      setPendingDeleteId(null);
     }
   };
 
@@ -166,7 +166,10 @@ const DashboardPage = () => {
                           <Button
                             variant="outline"
                             className="delete-action-btn"
-                            onClick={(event) => handleDelete(report.id, event)}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setPendingDeleteId(report.id);
+                            }}
                             disabled={deletingId === report.id}
                           >
                             <Trash2 size={16} />
@@ -191,6 +194,38 @@ const DashboardPage = () => {
           </>
         )}
       </div>
+
+      <Modal
+        isOpen={Boolean(pendingDeleteId)}
+        onClose={() => {
+          if (!deletingId) setPendingDeleteId(null);
+        }}
+        title="Confirm Delete"
+        size="sm"
+        closeOnOverlay={!deletingId}
+        closeOnEsc={!deletingId}
+        hideCloseButton={Boolean(deletingId)}
+      >
+        <div className="logout-confirmation">
+          <p>Are you sure you want to delete this report?</p>
+          <div className="modal-actions">
+            <Button
+              variant="outline"
+              onClick={() => setPendingDeleteId(null)}
+              disabled={Boolean(deletingId)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmDelete}
+              loading={Boolean(deletingId)}
+              loadingText="Deleting..."
+            >
+              Confirm Delete
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

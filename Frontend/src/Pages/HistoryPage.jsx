@@ -7,6 +7,7 @@ import "./Pages.css";
 import Card from "../Components/Card.jsx";
 import { Button } from "../Components/Button.jsx";
 import Spinner from "../Components/Spinner.jsx";
+import Modal from "../Components/Modal.jsx";
 import { downloadReportPdf } from "../utils/reportPdf";
 import { useToast } from "../Contexts/ToastContext";
 
@@ -17,19 +18,17 @@ const HistoryPage = () => {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
 
   const handleDownload = (report, event) => {
     event.stopPropagation();
     downloadReportPdf(report);
   };
 
-  const handleDelete = async (reportId, event) => {
-    event.stopPropagation();
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this report?",
-    );
-    if (!confirmed) return;
+  const confirmDelete = async () => {
+    if (!pendingDeleteId) return;
 
+    const reportId = pendingDeleteId;
     setDeletingId(reportId);
     try {
       const res = await authFetch(`/api/reports/${reportId}`, {
@@ -45,6 +44,7 @@ const HistoryPage = () => {
       addToast(err.message || "Failed to delete report", "error");
     } finally {
       setDeletingId(null);
+      setPendingDeleteId(null);
     }
   };
 
@@ -140,7 +140,10 @@ const HistoryPage = () => {
                     <Button
                       variant="outline"
                       className="delete-action-btn report-action-btn"
-                      onClick={(event) => handleDelete(report.id, event)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setPendingDeleteId(report.id);
+                      }}
                       disabled={deletingId === report.id}
                     >
                       <Trash2 size={16} />
@@ -159,6 +162,38 @@ const HistoryPage = () => {
           </div>
         )}
       </div>
+
+      <Modal
+        isOpen={Boolean(pendingDeleteId)}
+        onClose={() => {
+          if (!deletingId) setPendingDeleteId(null);
+        }}
+        title="Confirm Delete"
+        size="sm"
+        closeOnOverlay={!deletingId}
+        closeOnEsc={!deletingId}
+        hideCloseButton={Boolean(deletingId)}
+      >
+        <div className="logout-confirmation">
+          <p>Are you sure you want to delete this report?</p>
+          <div className="modal-actions">
+            <Button
+              variant="outline"
+              onClick={() => setPendingDeleteId(null)}
+              disabled={Boolean(deletingId)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmDelete}
+              loading={Boolean(deletingId)}
+              loadingText="Deleting..."
+            >
+              Confirm Delete
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
