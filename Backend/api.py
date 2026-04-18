@@ -11,7 +11,7 @@ from db import users, scans
 from middleware import login_required
 from bson import ObjectId
 from datetime import datetime
-import random
+from time import perf_counter
 import logging
 import importlib
 
@@ -50,15 +50,17 @@ def dashboard_stats():
         and s["date"].year == now.year
     )
 
-    # Most recent 3
+    # Most recent 5
     recent = []
-    for s in user_scans[:3]:
+    for s in user_scans[:5]:
         d = s.get("date", now)
         recent.append({
             "id": str(s["_id"]),
+            "reportName": s.get("reportName") or s.get("filename") or "Scan Report",
             "date": d.strftime("%Y-%m-%d") if isinstance(d, datetime) else str(d),
             "confidence": s.get("confidence", 0),
             "severity": s.get("severity", "Unknown"),
+            "findings": s.get("findings", ""),
         })
 
     return jsonify({
@@ -86,11 +88,14 @@ def get_reports():
         d = r.get("date", datetime.utcnow())
         reports.append({
             "id": str(r["_id"]),
+            "reportName": r.get("reportName") or r.get("filename") or "Scan Report",
+            "filename": r.get("filename", ""),
             "date": d.strftime("%Y-%m-%d") if isinstance(d, datetime) else str(d),
             "confidence": r.get("confidence", 0),
             "severity": r.get("severity", "Unknown"),
             "status": r.get("status", "Completed"),
             "findings": r.get("findings", ""),
+            "resultSummary": r.get("resultSummary", ""),
         })
 
     return jsonify({"reports": reports}), 200
@@ -116,6 +121,7 @@ def get_report(report_id):
     d = report.get("date", datetime.utcnow())
     return jsonify({
         "id": str(report["_id"]),
+        "reportName": report.get("reportName") or report.get("filename") or "Scan Report",
         "date": d.strftime("%Y-%m-%d") if isinstance(d, datetime) else str(d),
         "confidence": report.get("confidence", 0),
         "severity": report.get("severity", "Unknown"),
@@ -125,6 +131,8 @@ def get_report(report_id):
         "imageSize": report.get("imageSize", "N/A"),
         "imagePath": report.get("imagePath", ""),
         "filename": report.get("filename", ""),
+        "resultSummary": report.get("resultSummary", ""),
+        "detections": report.get("detections", []),
         "status": report.get("status", "Completed"),
     }), 200
 
@@ -135,18 +143,15 @@ def get_report(report_id):
 @login_required
 def upload_scan():
     """
-    Upload a dental image for analysis.
-    Creates a scan record linked to the authenticated user.
-    
-    NOTE: AI model integration is a future step — this currently
-    creates a placeholder analysis record.
+    Upload a dental image, run model inference, and save a report
+    linked to the authenticated user.
     """
     email = g.current_user["email"]
 
-    if "file" not in request.files:
+    file = request.files.get("image") or request.files.get("file")
+    if file is None:
         return jsonify({"error": "No file uploaded"}), 400
 
-    file = request.files["file"]
     if not file.filename:
         return jsonify({"error": "No file selected"}), 400
 
@@ -166,37 +171,81 @@ def upload_scan():
     if file_size > 10 * 1024 * 1024:  # 10 MB limit
         return jsonify({"error": "File too large. Maximum size is 10 MB."}), 400
 
-    # ── Placeholder analysis (replace with real AI model later) ──
-    confidence = random.randint(75, 98)
-    severities = ["Low", "Moderate", "High"]
-    severity = random.choices(severities, weights=[50, 35, 15])[0]
+    try:
+        np = importlib.import_module("numpy")
+        cv2 = importlib.import_module("cv2")
+        from model_loader import model
+    except Exception as exc:
+        log.exception("Upload dependencies unavailable")
+        return jsonify({
+            "error": "AI dependencies are missing. Install numpy, opencv-python and ultralytics.",
+            "details": str(exc),
+        }), 500
 
-    findings_map = {
-        "Low": "Minor enamel demineralization detected. No immediate treatment required.",
-        "Moderate": "Potential caries detected. Early intervention recommended.",
-        "High": "Significant caries formation observed. Immediate dental consultation advised.",
-    }
-    recommendations_map = {
-        "Low": "Maintain good oral hygiene. Follow-up in 6 months.",
-        "Moderate": "Schedule a dental appointment within 2-4 weeks for further evaluation.",
-        "High": "Urgent dental visit required. Treatment should begin as soon as possible.",
-    }
+    img = np.frombuffer(file_bytes, np.uint8)
+    img = cv2.imdecode(img, cv2.IMREAD_COLOR)
+    if img is None:
+        return jsonify({"error": "Invalid or unreadable image file."}), 400
+
+    start_time = perf_counter()
+    results = model(img)
+    elapsed = perf_counter() - start_time
+
+    detections = []
+    for r in results:
+        boxes = r.boxes.xyxy.cpu().numpy()
+        scores = r.boxes.conf.cpu().numpy()
+        for box, score in zip(boxes, scores):
+            x1, y1, x2, y2 = box
+            detections.append({
+                "bbox": [int(x1), int(y1), int(x2), int(y2)],
+                "confidence": float(score),
+            })
+
+    top_confidence = max((d["confidence"] for d in detections), default=0)
+    confidence = round(top_confidence * 100)
+    detection_count = len(detections)
+
+    if detection_count == 0:
+        severity = "Low"
+        findings = "No strong caries regions detected by the model."
+        recommendations = "Continue routine oral hygiene and periodic dental checkups."
+    elif confidence >= 75:
+        severity = "High"
+        findings = f"{detection_count} high-confidence suspicious region(s) detected."
+        recommendations = "Consult a dentist soon for a detailed examination and treatment plan."
+    elif confidence >= 45:
+        severity = "Moderate"
+        findings = f"{detection_count} suspicious region(s) detected with moderate confidence."
+        recommendations = "Book a dental evaluation to confirm findings and begin early care if needed."
+    else:
+        severity = "Low"
+        findings = f"{detection_count} low-confidence suspicious region(s) detected."
+        recommendations = "Monitor symptoms and follow up during your next routine dental visit."
+
+    now = datetime.utcnow()
+    report_name = file.filename or f"Scan {now.strftime('%Y-%m-%d %H:%M:%S')}"
+    result_summary = f"{detection_count} detection(s), severity: {severity}"
 
     scan_doc = {
         "user_email": email,
         "filename": file.filename,
+        "reportName": report_name,
         "fileSize": f"{file_size / 1024:.1f} KB",
-        "date": datetime.utcnow(),
+        "date": now,
         "confidence": confidence,
         "severity": severity,
-        "findings": findings_map[severity],
-        "recommendations": recommendations_map[severity],
-        "analysisTime": f"{random.uniform(1.5, 4.5):.1f} seconds",
+        "findings": findings,
+        "recommendations": recommendations,
+        "analysisTime": f"{elapsed:.2f} seconds",
         "imageSize": (
             f"{file_size / (1024 * 1024):.2f} MB"
             if file_size > 1024 * 1024
             else f"{file_size / 1024:.1f} KB"
         ),
+        "resultSummary": result_summary,
+        "detections": detections,
+        "detectionCount": detection_count,
         "status": "Completed",
     }
 
@@ -206,8 +255,14 @@ def upload_scan():
     return jsonify({
         "message": "Image uploaded and analyzed successfully",
         "reportId": str(result.inserted_id),
+        "reportName": report_name,
+        "date": now.strftime("%Y-%m-%d"),
         "severity": severity,
         "confidence": confidence,
+        "findings": findings,
+        "recommendations": recommendations,
+        "resultSummary": result_summary,
+        "detections": detections,
     }), 201
 
 

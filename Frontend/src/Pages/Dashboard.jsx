@@ -6,6 +6,7 @@ import Header from "../Components/Header.jsx";
 import Card from "../Components/Card.jsx";
 import { Button } from "../Components/Button.jsx";
 import Spinner from "../Components/Spinner.jsx";
+import { downloadReportPdf } from "../utils/reportPdf";
 import "./Pages.css";
 
 const DashboardPage = () => {
@@ -65,11 +66,11 @@ const DashboardPage = () => {
                   <p>Total Scans</p>
                 </div>
               </Card>
-              <Card className="stat-card">
+              <Card className="stat-card confidence-stat-card">
                 <div className="stat-icon">✅</div>
                 <div className="stat-content">
                   <h3>{stats?.avgConfidence ?? 0}%</h3>
-                  <p>Avg Confidence</p>
+                  <p>Confidence Score</p>
                 </div>
               </Card>
               <Card className="stat-card">
@@ -107,7 +108,7 @@ const DashboardPage = () => {
                       >
                         <div className="report-preview">📄</div>
                         <div className="report-info">
-                          <h4>Scan Report</h4>
+                          <h4>{report.reportName || "Scan Report"}</h4>
                           <p>{report.date}</p>
                         </div>
                         <div className="report-meta">
@@ -116,9 +117,18 @@ const DashboardPage = () => {
                           >
                             {report.severity}
                           </span>
-                          <span className="confidence">
-                            {report.confidence}%
-                          </span>
+                          <Button
+                            variant="outline"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              downloadReportPdf({
+                                ...report,
+                                resultSummary: report.findings,
+                              });
+                            }}
+                          >
+                            Download
+                          </Button>
                         </div>
                       </Card>
                     ))}
@@ -126,13 +136,9 @@ const DashboardPage = () => {
                 ) : (
                   <div className="empty-state">
                     <FileText size={48} />
-                    <p>No reports yet</p>
-                    <Button
-                      variant="outline"
-                      onClick={() => navigate("/upload")}
-                    >
-                      Upload First Image
-                    </Button>
+                    <p>
+                      No reports yet. Run your first scan to see results here.
+                    </p>
                   </div>
                 )}
               </div>

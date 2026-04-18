@@ -1,13 +1,13 @@
 import React, { useState, useRef } from "react";
 //import { useNavigate } from "../App.jsx";
 import { Upload, Camera, FileText } from "lucide-react";
-//import { useAuth } from "../Contexts/AuthContext";
+import { useAuth } from "../Contexts/AuthContext";
 import Header from "../Components/Header.jsx";
 import Card from "../Components/Card.jsx";
 import { Button } from "../Components/Button.jsx";
 import { useToast } from "../Contexts/ToastContext";
+import { downloadReportPdf } from "../utils/reportPdf";
 import "./report.css";
-import axios from "axios";
 
 const UploadPage = () => {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -18,8 +18,7 @@ const UploadPage = () => {
   const [preview, setPreview] = useState(null);
   const canvasRef = useRef(null);
   const imageRef = useRef(null);
-  const [reportText, setReportText] = useState("");
-  //const { authFetch } = useAuth();
+  const { authFetch } = useAuth();
   const { addToast } = useToast();
   //const navigate = useNavigate();
   const fileInputRef = useRef(null);
@@ -110,44 +109,49 @@ const UploadPage = () => {
 
     try {
       const formData = new FormData();
-
-      // ⚠️ IMPORTANT: backend me key "image" hai
       formData.append("image", selectedFile);
 
-      const res = await axios.post("http://127.0.0.1:5000/predict", formData);
-      setResult(res.data);
+      const res = await authFetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Detection failed");
+      }
+      setResult(data);
 
       clearInterval(interval);
       setProgress(100);
 
-      console.log("AI Result:", res.data);
+      console.log("AI Result:", data);
 
       addToast("Analysis complete!", "success");
 
       setTimeout(() => {
         setUploading(false);
-
-        // 👉 temporary: just log
-        console.log(res.data);
-
-        // 👉 next step me yahan navigate karenge
-        // navigate("/report", { state: res.data });
       }, 500);
     } catch (err) {
       clearInterval(interval);
       setUploading(false);
       console.error(err);
-      addToast("Detection failed", "error");
+      addToast(err.message || "Detection failed", "error");
     }
   };
 
-  const handleDownloadPDF = async () => {
+  const handleDownloadPDF = () => {
     try {
-      await axios.post("http://127.0.0.1:5000/api/generate-pdf", {
-        report: reportText,
-      });
-
-      window.open("http://127.0.0.1:5000/api/generate-pdf");
+      if (!result) {
+        addToast("No report data available", "error");
+        return;
+      }
+      const reportForPdf = {
+        ...result,
+        id: result.reportId,
+        filename: selectedFile?.name || result.filename,
+      };
+      downloadReportPdf(reportForPdf);
+      addToast("PDF downloaded", "success");
     } catch (err) {
       console.error(err);
       addToast("PDF generation failed", "error");
@@ -252,9 +256,17 @@ const UploadPage = () => {
 
               <Button onClick={handleDownloadPDF}>Download PDF</Button>
 
-              <p>Total Detections: {result.detections.length}</p>
+              <p>
+                Report:{" "}
+                {result.reportName || selectedFile?.name || "Scan Report"}
+              </p>
+              <p>
+                Date: {result.date || new Date().toISOString().slice(0, 10)}
+              </p>
+              <p>Findings: {result.findings || "No findings available"}</p>
+              <p>Total Detections: {result.detections?.length || 0}</p>
 
-              {result.detections.map((det, index) => (
+              {(result.detections || []).map((det, index) => (
                 <div key={index} style={{ marginBottom: "10px" }}>
                   <p>Box: {det.bbox.join(", ")}</p>
                   <p>Confidence: {(det.confidence * 100).toFixed(2)}%</p>

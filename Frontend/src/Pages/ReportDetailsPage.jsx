@@ -7,6 +7,7 @@ import Card from "../Components/Card.jsx";
 import { Button } from "../Components/Button.jsx";
 import Spinner from "../Components/Spinner.jsx";
 import { useToast } from "../Contexts/ToastContext";
+import { downloadReportPdf } from "../utils/reportPdf";
 import "./Pages.css";
 
 const ReportDetailsPage = () => {
@@ -45,6 +46,7 @@ const ReportDetailsPage = () => {
   }, [id, authFetch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDownload = () => {
+    downloadReportPdf(report);
     addToast("Report downloaded successfully", "success");
   };
 
@@ -73,7 +75,7 @@ const ReportDetailsPage = () => {
         </button>
 
         <div className="report-header">
-          <h1>Scan Report</h1>
+          <h1>{report.reportName || "Scan Report"}</h1>
           <span className="report-date">{report.date}</span>
         </div>
 
