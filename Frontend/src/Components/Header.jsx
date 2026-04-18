@@ -7,7 +7,7 @@ import { useNavigate } from "../App.jsx";
 import Button from "./Button.jsx";
 import Modal from "./Modal.jsx";
 
-const Header = ({ isLanding = false }) => {
+const Header = ({ isLanding = false, minimal = false }) => {
   const { isAuthenticated, logout } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
@@ -46,7 +46,7 @@ const Header = ({ isLanding = false }) => {
           </div>
 
           <nav className="nav">
-            {isLanding ? (
+            {minimal ? null : isLanding ? (
               <>
                 <a href="#features">Features</a>
                 <a href="#how-it-works">How It Works</a>

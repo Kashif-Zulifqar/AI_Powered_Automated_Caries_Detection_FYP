@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, createContext} from "react";
+import React, { useState, useEffect, useContext, createContext } from "react";
 import { AuthProvider, useAuth } from "./Contexts/AuthContext";
 import { ToastProvider } from "./Contexts/ToastContext";
 import Spinner from "./Components/Spinner";
@@ -125,6 +125,27 @@ const Routes = () => {
   const { currentPath, transitionStage, transitionEnabled } = useRoute();
   const { isAuthenticated, initializing } = useAuth();
 
+  useEffect(() => {
+    if (initializing) return;
+
+    const protectedRoute =
+      currentPath === "/dashboard" ||
+      currentPath === "/upload" ||
+      currentPath === "/results" ||
+      currentPath === "/history" ||
+      currentPath === "/profile" ||
+      currentPath.startsWith("/report/");
+
+    if (isAuthenticated && currentPath === "/login") {
+      window.location.hash = "/dashboard";
+      return;
+    }
+
+    if (!isAuthenticated && protectedRoute) {
+      window.location.hash = "/login";
+    }
+  }, [currentPath, isAuthenticated, initializing]);
+
   // Show full-page loader while checking stored token
   if (initializing) {
     return (
@@ -140,7 +161,7 @@ const Routes = () => {
   if (currentPath === "/" || currentPath === "") {
     Component = LandingPage;
   } else if (currentPath === "/login") {
-    Component = LoginPage;
+    Component = isAuthenticated ? DashboardPage : LoginPage;
   } else if (currentPath === "/signup") {
     Component = SignupPage;
   } else if (currentPath === "/signup/confirm") {

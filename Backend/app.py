@@ -40,6 +40,14 @@ def create_app():
     app.register_blueprint(auth)
     app.register_blueprint(api)
 
+    # Backward-compatible alias used by current frontend upload page
+    app.add_url_rule(
+        "/predict",
+        endpoint="predict_alias",
+        view_func=app.view_functions["api.predict"],
+        methods=["POST"],
+    )
+
     return app
 
 if __name__ == "__main__":

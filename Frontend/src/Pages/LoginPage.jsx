@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "../App.jsx";
 import { useAuth } from "../Contexts/AuthContext";
 import { useToast } from "../Contexts/ToastContext";
@@ -9,10 +9,20 @@ import "./Pages.css";
 const LoginPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const { login } = useAuth();
+  const { login, isAuthenticated, initializing } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!initializing && isAuthenticated) {
+      navigate("/dashboard");
+    }
+  }, [initializing, isAuthenticated, navigate]);
+
+  if (initializing || isAuthenticated) {
+    return null;
+  }
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -38,7 +48,7 @@ const LoginPage = () => {
 
   return (
     <div className="auth-page">
-      <Header />
+      <Header minimal />
       <div className="auth-container">
         <Card className="auth-card">
           <h1>Welcome Back</h1>
