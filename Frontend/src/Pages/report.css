@@ -1,0 +1,20 @@
+.medical-report-box{
+    background:#ffffff;
+    border-radius:14px;
+    padding:25px;
+    margin-top:20px;
+    box-shadow:0 8px 25px rgba(0,0,0,0.08);
+  }
+  
+  .medical-report-box h2{
+    color:#0f172a;
+    margin-bottom:18px;
+  }
+  
+  .report-text{
+    white-space:pre-wrap;
+    line-height:1.8;
+    font-size:16px;
+    color:#334155;
+    font-family:Arial, Helvetica, sans-serif;
+  }

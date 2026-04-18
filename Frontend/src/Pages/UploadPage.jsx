@@ -6,7 +6,7 @@ import Header from "../Components/Header.jsx";
 import Card from "../Components/Card.jsx";
 import { Button } from "../Components/Button.jsx";
 import { useToast } from "../Contexts/ToastContext";
-import "./Pages.css";
+import "./report.css";
 import axios from "axios";
 
 const UploadPage = () => {
@@ -15,6 +15,10 @@ const UploadPage = () => {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const canvasRef = useRef(null);
+  const imageRef = useRef(null);
+  const [reportText, setReportText] = useState("");
   //const { authFetch } = useAuth();
   const { addToast } = useToast();
   //const navigate = useNavigate();
@@ -35,14 +39,58 @@ const UploadPage = () => {
     const files = e.dataTransfer.files;
     if (files.length > 0) {
       setSelectedFile(files[0]);
+      setPreview(URL.createObjectURL(files[0])); //preview ke liye URL.createObjectURL ka use kiya hai
       addToast("File selected successfully", "success");
     }
+  };
+
+  const drawBoxes = (detections) => {
+    const canvas = canvasRef.current;
+    const image = imageRef.current;
+
+    const ctx = canvas.getContext("2d");
+
+    // Actual image size
+    const imgWidth = image.naturalWidth;
+    const imgHeight = image.naturalHeight;
+
+    // Displayed image size
+    const displayWidth = image.clientWidth;
+    const displayHeight = image.clientHeight;
+
+    // Scale factors
+    const scaleX = displayWidth / imgWidth;
+    const scaleY = displayHeight / imgHeight;
+
+    canvas.width = displayWidth;
+    canvas.height = displayHeight;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    detections.forEach((det) => {
+      let [x1, y1, x2, y2] = det.bbox;
+
+      // 🔥 SCALE FIX
+      x1 *= scaleX;
+      x2 *= scaleX;
+      y1 *= scaleY;
+      y2 *= scaleY;
+
+      ctx.strokeStyle = "red";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+
+      ctx.fillStyle = "red";
+      ctx.font = "14px Arial";
+      ctx.fillText((det.confidence * 100).toFixed(1) + "%", x1, y1 - 5);
+    });
   };
 
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
       setSelectedFile(file);
+      setPreview(URL.createObjectURL(file));
       addToast("File selected successfully", "success");
     }
   };
@@ -66,10 +114,7 @@ const UploadPage = () => {
       // ⚠️ IMPORTANT: backend me key "image" hai
       formData.append("image", selectedFile);
 
-      const res = await axios.post(
-        "http://127.0.0.1:5000/api/predict",
-        formData,
-      );
+      const res = await axios.post("http://127.0.0.1:5000/predict", formData);
       setResult(res.data);
 
       clearInterval(interval);
@@ -93,6 +138,19 @@ const UploadPage = () => {
       setUploading(false);
       console.error(err);
       addToast("Detection failed", "error");
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    try {
+      await axios.post("http://127.0.0.1:5000/api/generate-pdf", {
+        report: reportText,
+      });
+
+      window.open("http://127.0.0.1:5000/api/generate-pdf");
+    } catch (err) {
+      console.error(err);
+      addToast("PDF generation failed", "error");
     }
   };
 
@@ -191,6 +249,8 @@ const UploadPage = () => {
           {result && (
             <div className="result-section">
               <h3>Detection Results</h3>
+
+              <Button onClick={handleDownloadPDF}>Download PDF</Button>
 
               <p>Total Detections: {result.detections.length}</p>
 

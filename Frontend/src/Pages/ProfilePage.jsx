@@ -16,8 +16,7 @@ const ProfilePage = () => {
     authFetch,
     updateProfile,
     changePassword,
-    deleteAccount,
-    logout,
+    deleteAccount
   } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
