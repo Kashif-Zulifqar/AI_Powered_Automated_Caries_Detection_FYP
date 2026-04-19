@@ -329,6 +329,19 @@ def upload_scan():
     detection_count = len(detections)
     confidence_values = [d["confidence"] * 100 for d in detections]
     avg_confidence = round(sum(confidence_values) / detection_count, 1) if detection_count else 0.0
+
+    # Skip report creation for non-relevant uploads with zero confidence.
+    if avg_confidence <= 0:
+        return (
+            jsonify(
+                {
+                    "error": "No relevant dental findings were detected. Report was not generated.",
+                    "reportGenerated": False,
+                }
+            ),
+            422,
+        )
+
     overall_confidence_level = confidence_band(avg_confidence)
     verdict_level, verdict_text = verdict_for_detections(detection_count, confidence_values)
 
