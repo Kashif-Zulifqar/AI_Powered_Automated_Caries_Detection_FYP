@@ -11,13 +11,8 @@ import { useToast } from "../Contexts/ToastContext";
 import "./Pages.css";
 
 const ProfilePage = () => {
-  const {
-    user,
-    authFetch,
-    updateProfile,
-    changePassword,
-    deleteAccount
-  } = useAuth();
+  const { user, authFetch, updateProfile, changePassword, deleteAccount } =
+    useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
@@ -158,6 +153,11 @@ const ProfilePage = () => {
                 <div className="profile-info">
                   <h2>{displayUser?.name}</h2>
                   <p>{displayUser?.email}</p>
+                  <p className="patient-id-display">
+                    Patient ID:{" "}
+                    {displayUser?.patientId ||
+                      "Will be generated after first report"}
+                  </p>
                 </div>
               </div>
 

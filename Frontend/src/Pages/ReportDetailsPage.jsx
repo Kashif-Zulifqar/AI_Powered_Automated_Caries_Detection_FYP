@@ -45,9 +45,13 @@ const ReportDetailsPage = () => {
     };
   }, [id, authFetch]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleDownload = () => {
-    downloadReportPdf(report);
-    addToast("Report downloaded successfully", "success");
+  const handleDownload = async () => {
+    try {
+      await downloadReportPdf(authFetch, report.id, report.reportId);
+      addToast("Report downloaded successfully", "success");
+    } catch (err) {
+      addToast(err.message || "Failed to download PDF", "error");
+    }
   };
 
   if (loading) {
@@ -117,11 +121,16 @@ const ReportDetailsPage = () => {
               </div>
               <div className="metric-item">
                 <span className="metric-label">Confidence Score</span>
-                <span className="metric-value">{report.confidence}%</span>
+                <span className="metric-value">
+                  {Math.round(
+                    report.averageConfidence ?? report.confidence ?? 0,
+                  )}
+                  %
+                </span>
               </div>
               <div className="metric-item">
                 <span className="metric-label">Analysis Time</span>
-                <span className="metric-value">{report.analysisTime}</span>
+                <span className="metric-value">{report.analysisDuration}</span>
               </div>
               <div className="metric-item">
                 <span className="metric-label">Image Size</span>

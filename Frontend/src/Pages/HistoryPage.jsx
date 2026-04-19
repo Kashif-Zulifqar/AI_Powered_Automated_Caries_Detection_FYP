@@ -20,9 +20,14 @@ const HistoryPage = () => {
   const [deletingId, setDeletingId] = useState(null);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
 
-  const handleDownload = (report, event) => {
+  const handleDownload = async (report, event) => {
     event.stopPropagation();
-    downloadReportPdf(report);
+    try {
+      await downloadReportPdf(authFetch, report.id, report.reportId);
+      addToast("PDF downloaded", "success");
+    } catch (err) {
+      addToast(err.message || "Failed to download PDF", "error");
+    }
   };
 
   const confirmDelete = async () => {
@@ -99,7 +104,9 @@ const HistoryPage = () => {
                       report.findings ||
                       "No summary available"}
                   </p>
-                  <p className="history-id">Report ID: {report.id}</p>
+                  <p className="history-id">
+                    Report ID: {report.reportId || report.id}
+                  </p>
                   <div className="report-stats">
                     <div className="stat">
                       <span className="stat-label">Severity</span>
@@ -112,7 +119,10 @@ const HistoryPage = () => {
                     <div className="stat">
                       <span className="stat-label">Confidence</span>
                       <span className="confidence-badge">
-                        {report.confidence}%
+                        {Math.round(
+                          report.averageConfidence ?? report.confidence ?? 0,
+                        )}
+                        %
                       </span>
                     </div>
                   </div>

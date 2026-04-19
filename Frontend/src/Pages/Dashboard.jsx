@@ -76,6 +76,11 @@ const DashboardPage = () => {
           <div>
             <h1>Hello, {user?.name || "User"}! 👋</h1>
             <p>Welcome to your dental analysis dashboard</p>
+            {stats?.patientId && (
+              <p className="patient-id-display">
+                Patient ID: {stats.patientId}
+              </p>
+            )}
           </div>
           <div className="dashboard-actions">
             <button className="icon-button">
@@ -153,12 +158,21 @@ const DashboardPage = () => {
                           <Button
                             variant="outline"
                             className="report-action-btn"
-                            onClick={(event) => {
+                            onClick={async (event) => {
                               event.stopPropagation();
-                              downloadReportPdf({
-                                ...report,
-                                resultSummary: report.findings,
-                              });
+                              try {
+                                await downloadReportPdf(
+                                  authFetch,
+                                  report.id,
+                                  report.reportId,
+                                );
+                                addToast("PDF downloaded", "success");
+                              } catch (err) {
+                                addToast(
+                                  err.message || "Failed to download PDF",
+                                  "error",
+                                );
+                              }
                             }}
                           >
                             Download

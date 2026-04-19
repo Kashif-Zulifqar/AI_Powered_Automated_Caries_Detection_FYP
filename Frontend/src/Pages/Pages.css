@@ -276,6 +276,13 @@ html {
   color: #666;
 }
 
+.patient-id-display {
+  margin-top: 0.35rem;
+  color: #0b4d74;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
 .dashboard-actions {
   display: flex;
   gap: 1rem;
@@ -575,6 +582,37 @@ html {
 
 .analyze-button {
   width: 100%;
+}
+
+.clean-result-summary {
+  margin-top: 1.25rem;
+  background: linear-gradient(135deg, #f8fbff 0%, #eef7f3 100%);
+  border: 1px solid #d6e9ff;
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+}
+
+.clean-result-summary h3 {
+  margin: 0 0 0.7rem;
+  color: #0f172a;
+}
+
+.result-pill {
+  margin: 0.35rem 0;
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.result-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.95rem;
+  flex-wrap: wrap;
+}
+
+.result-actions .btn {
+  flex: 1;
+  min-width: 180px;
 }
 
 .upload-tips {

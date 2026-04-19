@@ -15,9 +15,6 @@ const UploadPage = () => {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState(null);
-  const [preview, setPreview] = useState(null);
-  const canvasRef = useRef(null);
-  const imageRef = useRef(null);
   const { authFetch } = useAuth();
   const { addToast } = useToast();
   //const navigate = useNavigate();
@@ -38,59 +35,25 @@ const UploadPage = () => {
     const files = e.dataTransfer.files;
     if (files.length > 0) {
       setSelectedFile(files[0]);
-      setPreview(URL.createObjectURL(files[0])); //preview ke liye URL.createObjectURL ka use kiya hai
       addToast("File selected successfully", "success");
     }
-  };
-
-  const drawBoxes = (detections) => {
-    const canvas = canvasRef.current;
-    const image = imageRef.current;
-
-    const ctx = canvas.getContext("2d");
-
-    // Actual image size
-    const imgWidth = image.naturalWidth;
-    const imgHeight = image.naturalHeight;
-
-    // Displayed image size
-    const displayWidth = image.clientWidth;
-    const displayHeight = image.clientHeight;
-
-    // Scale factors
-    const scaleX = displayWidth / imgWidth;
-    const scaleY = displayHeight / imgHeight;
-
-    canvas.width = displayWidth;
-    canvas.height = displayHeight;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    detections.forEach((det) => {
-      let [x1, y1, x2, y2] = det.bbox;
-
-      // 🔥 SCALE FIX
-      x1 *= scaleX;
-      x2 *= scaleX;
-      y1 *= scaleY;
-      y2 *= scaleY;
-
-      ctx.strokeStyle = "red";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
-
-      ctx.fillStyle = "red";
-      ctx.font = "14px Arial";
-      ctx.fillText((det.confidence * 100).toFixed(1) + "%", x1, y1 - 5);
-    });
   };
 
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
       setSelectedFile(file);
-      setPreview(URL.createObjectURL(file));
       addToast("File selected successfully", "success");
+    }
+  };
+
+  const handleRunAnotherScan = () => {
+    setSelectedFile(null);
+    setResult(null);
+    setProgress(0);
+    setUploading(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   };
 
@@ -124,8 +87,6 @@ const UploadPage = () => {
       clearInterval(interval);
       setProgress(100);
 
-      console.log("AI Result:", data);
-
       addToast("Analysis complete!", "success");
 
       setTimeout(() => {
@@ -140,22 +101,23 @@ const UploadPage = () => {
   };
 
   const handleDownloadPDF = () => {
-    try {
+    (async () => {
       if (!result) {
         addToast("No report data available", "error");
         return;
       }
-      const reportForPdf = {
-        ...result,
-        id: result.reportId,
-        filename: selectedFile?.name || result.filename,
-      };
-      downloadReportPdf(reportForPdf);
-      addToast("PDF downloaded", "success");
-    } catch (err) {
-      console.error(err);
-      addToast("PDF generation failed", "error");
-    }
+      try {
+        const reportDbId = result.reportDbId;
+        await downloadReportPdf(
+          authFetch,
+          reportDbId,
+          result.reportId || selectedFile?.name,
+        );
+        addToast("PDF downloaded", "success");
+      } catch (err) {
+        addToast(err.message || "PDF download failed", "error");
+      }
+    })();
   };
 
   return (
@@ -251,27 +213,21 @@ const UploadPage = () => {
             {uploading ? "Analyzing..." : "Analyze Now"}
           </Button>
           {result && (
-            <div className="result-section">
-              <h3>Detection Results</h3>
-
-              <Button onClick={handleDownloadPDF}>Download PDF</Button>
-
-              <p>
-                Report:{" "}
-                {result.reportName || selectedFile?.name || "Scan Report"}
+            <div className="result-section clean-result-summary">
+              <h3>Analysis Complete</h3>
+              <p className="result-pill">
+                Total Detections: {result.totalDetections ?? 0}
               </p>
-              <p>
-                Date: {result.date || new Date().toISOString().slice(0, 10)}
+              <p className="result-pill">
+                Overall Confidence Level:{" "}
+                {result.overallConfidenceLevel || "Low"}
               </p>
-              <p>Findings: {result.findings || "No findings available"}</p>
-              <p>Total Detections: {result.detections?.length || 0}</p>
-
-              {(result.detections || []).map((det, index) => (
-                <div key={index} style={{ marginBottom: "10px" }}>
-                  <p>Box: {det.bbox.join(", ")}</p>
-                  <p>Confidence: {(det.confidence * 100).toFixed(2)}%</p>
-                </div>
-              ))}
+              <div className="result-actions">
+                <Button onClick={handleDownloadPDF}>View Full Report</Button>
+                <Button variant="outline" onClick={handleRunAnotherScan}>
+                  Run Another Scan
+                </Button>
+              </div>
             </div>
           )}
         </Card>

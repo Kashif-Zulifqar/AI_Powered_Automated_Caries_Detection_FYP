@@ -181,6 +181,7 @@ def login():
         "token": token,
         "name": user["name"],
         "email": email,
+        "patientId": user.get("patientId"),
     }), 200
 
 

@@ -1,4 +1,22 @@
 import os
+import site
+import sys
+from pathlib import Path
+
+
+def _ensure_project_venv_packages():
+    """Load local .venv packages when launched from a non-venv interpreter."""
+    if os.environ.get("VIRTUAL_ENV"):
+        return
+
+    project_root = Path(__file__).resolve().parent.parent
+    venv_site = project_root / ".venv" / "Lib" / "site-packages"
+    if venv_site.exists() and str(venv_site) not in sys.path:
+        site.addsitedir(str(venv_site))
+
+
+_ensure_project_venv_packages()
+
 from flask import Flask, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv

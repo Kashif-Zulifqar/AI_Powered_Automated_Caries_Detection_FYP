@@ -1,77 +1,161 @@
 """
-DentalAI — Protected API Routes
+DentalAI - Protected API Routes
 =================================
-All routes require JWT authentication via ``@login_required``.
-Every database query is scoped to ``g.current_user["email"]``
+All routes require JWT authentication via @login_required.
+Every database query is scoped to g.current_user["email"]
 so users can only access their own data.
 """
 
-from flask import Blueprint, request, jsonify, g
-from db import users, scans
-from middleware import login_required
-from bson import ObjectId
+import importlib
+import logging
+import os
 from datetime import datetime
 from time import perf_counter
-import logging
-import importlib
+
+from bson import ObjectId
+from flask import Blueprint, g, jsonify, request, send_file
+
+from db import scans, users
+from middleware import login_required
+from reporting import (
+    APP_GENERATOR,
+    APP_NAME,
+    build_report_pdf,
+    confidence_band,
+    draw_annotated_image,
+    generate_patient_id,
+    generate_report_id,
+    verdict_for_detections,
+)
 
 api = Blueprint("api", __name__, url_prefix="/api")
 log = logging.getLogger("dentalai.api")
 
 
-# ─── Dashboard Stats ─────────────────────────────────────────────────────────
+# --- Internal helpers --------------------------------------------------------
+
+def _get_or_create_patient_profile(email: str, fallback_name: str = "Patient") -> tuple[str, str]:
+    user = users.find_one({"email": email}, {"patientId": 1, "name": 1}) or {}
+    existing_patient_id = user.get("patientId")
+    patient_name = (user.get("name") or fallback_name or "Patient").strip()
+
+    if existing_patient_id:
+        return existing_patient_id, patient_name
+
+    patient_id = generate_patient_id(year=datetime.utcnow().year)
+    users.update_one({"email": email}, {"$set": {"patientId": patient_id}})
+    return patient_id, patient_name
+
+
+def _serialize_report(report: dict) -> dict:
+    date_value = report.get("date", datetime.utcnow())
+    if isinstance(date_value, datetime):
+        date_str = date_value.strftime("%Y-%m-%d")
+    else:
+        date_str = str(date_value)
+
+    average_confidence = report.get("averageConfidence", report.get("confidence", 0))
+
+    return {
+        "id": str(report["_id"]),
+        "reportId": report.get("reportId", str(report["_id"])),
+        "patientId": report.get("patientId", "N/A"),
+        "reportName": report.get("reportName") or report.get("filename") or "Scan Report",
+        "filename": report.get("filename", ""),
+        "date": date_str,
+        "time": report.get("analysisTimeOfDay", "N/A"),
+        "confidence": round(float(average_confidence)) if average_confidence is not None else 0,
+        "averageConfidence": float(average_confidence or 0),
+        "overallConfidenceLevel": report.get("overallConfidenceLevel", "Low"),
+        "severity": report.get("severity", "Unknown"),
+        "status": report.get("status", "Completed"),
+        "findings": report.get("findings", ""),
+        "resultSummary": report.get("resultSummary", ""),
+        "totalDetections": report.get("totalDetections", report.get("detectionCount", 0)),
+        "finalVerdictLevel": report.get("finalVerdictLevel", "None"),
+        "pdfAvailable": bool(report.get("pdfPath")),
+    }
+
+
+# --- Dashboard Stats ---------------------------------------------------------
 
 @api.get("/dashboard-stats")
 @login_required
 def dashboard_stats():
-    """Aggregated dashboard statistics — scoped to the authenticated user."""
+    """Aggregated dashboard statistics scoped to the authenticated user."""
     email = g.current_user["email"]
 
-    user_scans = list(scans.find(
-        {"user_email": email},
-        {"_id": 1, "date": 1, "confidence": 1, "severity": 1},
-    ).sort("date", -1))
+    user_scans = list(
+        scans.find(
+            {"user_email": email},
+            {
+                "_id": 1,
+                "date": 1,
+                "averageConfidence": 1,
+                "confidence": 1,
+                "severity": 1,
+                "reportName": 1,
+                "filename": 1,
+                "findings": 1,
+                "reportId": 1,
+                "finalVerdictLevel": 1,
+            },
+        ).sort("date", -1)
+    )
 
     total = len(user_scans)
-
-    # Average confidence
     avg_confidence = 0
     if total > 0:
         avg_confidence = round(
-            sum(s.get("confidence", 0) for s in user_scans) / total
+            sum(
+                s.get("averageConfidence", s.get("confidence", 0))
+                for s in user_scans
+            )
+            / total
         )
 
-    # Count this month
     now = datetime.utcnow()
     this_month = sum(
-        1 for s in user_scans
+        1
+        for s in user_scans
         if isinstance(s.get("date"), datetime)
         and s["date"].month == now.month
         and s["date"].year == now.year
     )
 
-    # Most recent 5
     recent = []
     for s in user_scans[:5]:
         d = s.get("date", now)
-        recent.append({
-            "id": str(s["_id"]),
-            "reportName": s.get("reportName") or s.get("filename") or "Scan Report",
-            "date": d.strftime("%Y-%m-%d") if isinstance(d, datetime) else str(d),
-            "confidence": s.get("confidence", 0),
-            "severity": s.get("severity", "Unknown"),
-            "findings": s.get("findings", ""),
-        })
+        recent.append(
+            {
+                "id": str(s["_id"]),
+                "reportId": s.get("reportId", str(s["_id"])),
+                "reportName": s.get("reportName") or s.get("filename") or "Scan Report",
+                "date": d.strftime("%Y-%m-%d") if isinstance(d, datetime) else str(d),
+                "confidence": round(
+                    float(s.get("averageConfidence", s.get("confidence", 0)))
+                ),
+                "severity": s.get("severity", "Unknown"),
+                "findings": s.get("findings", ""),
+                "finalVerdictLevel": s.get("finalVerdictLevel", "None"),
+            }
+        )
 
-    return jsonify({
-        "totalScans": total,
-        "avgConfidence": avg_confidence,
-        "thisMonth": this_month,
-        "recentReports": recent,
-    }), 200
+    return (
+        jsonify(
+            {
+                "totalScans": total,
+                "avgConfidence": avg_confidence,
+                "thisMonth": this_month,
+                "recentReports": recent,
+                "patientId": g.current_user.get("patientId"),
+            }
+        ),
+        200,
+    )
 
 
-# ─── Reports List ────────────────────────────────────────────────────────────
+# --- Reports List ------------------------------------------------------------
 
 @api.get("/reports")
 @login_required
@@ -79,34 +163,17 @@ def get_reports():
     """All reports for the authenticated user, newest first."""
     email = g.current_user["email"]
 
-    user_reports = list(scans.find(
-        {"user_email": email},
-    ).sort("date", -1))
-
-    reports = []
-    for r in user_reports:
-        d = r.get("date", datetime.utcnow())
-        reports.append({
-            "id": str(r["_id"]),
-            "reportName": r.get("reportName") or r.get("filename") or "Scan Report",
-            "filename": r.get("filename", ""),
-            "date": d.strftime("%Y-%m-%d") if isinstance(d, datetime) else str(d),
-            "confidence": r.get("confidence", 0),
-            "severity": r.get("severity", "Unknown"),
-            "status": r.get("status", "Completed"),
-            "findings": r.get("findings", ""),
-            "resultSummary": r.get("resultSummary", ""),
-        })
-
+    user_reports = list(scans.find({"user_email": email}).sort("date", -1))
+    reports = [_serialize_report(report) for report in user_reports]
     return jsonify({"reports": reports}), 200
 
 
-# ─── Single Report ───────────────────────────────────────────────────────────
+# --- Single Report -----------------------------------------------------------
 
 @api.get("/reports/<report_id>")
 @login_required
 def get_report(report_id):
-    """Single report detail — verified to belong to the authenticated user."""
+    """Single report detail verified to belong to the authenticated user."""
     email = g.current_user["email"]
 
     try:
@@ -118,23 +185,42 @@ def get_report(report_id):
     if not report:
         return jsonify({"error": "Report not found"}), 404
 
-    d = report.get("date", datetime.utcnow())
-    return jsonify({
-        "id": str(report["_id"]),
-        "reportName": report.get("reportName") or report.get("filename") or "Scan Report",
-        "date": d.strftime("%Y-%m-%d") if isinstance(d, datetime) else str(d),
-        "confidence": report.get("confidence", 0),
-        "severity": report.get("severity", "Unknown"),
-        "findings": report.get("findings", "No findings recorded"),
-        "recommendations": report.get("recommendations", ""),
-        "analysisTime": report.get("analysisTime", "N/A"),
-        "imageSize": report.get("imageSize", "N/A"),
-        "imagePath": report.get("imagePath", ""),
-        "filename": report.get("filename", ""),
-        "resultSummary": report.get("resultSummary", ""),
-        "detections": report.get("detections", []),
-        "status": report.get("status", "Completed"),
-    }), 200
+    payload = _serialize_report(report)
+    payload.update(
+        {
+            "findings": report.get("findings", "No findings recorded"),
+            "recommendations": report.get("recommendations", ""),
+            "analysisDuration": report.get("analysisDuration", "N/A"),
+            "imageSize": report.get("imageSize", "N/A"),
+            "resultSummary": report.get("resultSummary", ""),
+            "detections": report.get("detections", []),
+            "verdictText": report.get("verdictText", ""),
+        }
+    )
+    return jsonify(payload), 200
+
+
+@api.get("/reports/<report_id>/pdf")
+@login_required
+def download_report_pdf(report_id):
+    """Download the generated PDF for a report owned by the authenticated user."""
+    email = g.current_user["email"]
+
+    try:
+        oid = ObjectId(report_id)
+    except Exception:
+        return jsonify({"error": "Invalid report ID"}), 400
+
+    report = scans.find_one({"_id": oid, "user_email": email}, {"pdfPath": 1, "reportId": 1})
+    if not report:
+        return jsonify({"error": "Report not found"}), 404
+
+    pdf_path = report.get("pdfPath")
+    if not pdf_path or not os.path.exists(pdf_path):
+        return jsonify({"error": "PDF not available for this report"}), 404
+
+    download_name = f"{report.get('reportId', 'dental-report')}.pdf"
+    return send_file(pdf_path, as_attachment=True, download_name=download_name)
 
 
 @api.delete("/reports/<report_id>")
@@ -148,22 +234,33 @@ def delete_report(report_id):
     except Exception:
         return jsonify({"error": "Invalid report ID"}), 400
 
+    report = scans.find_one({"_id": oid, "user_email": email}, {"pdfPath": 1})
+    if not report:
+        return jsonify({"error": "Report not found"}), 404
+
     deleted = scans.delete_one({"_id": oid, "user_email": email})
     if deleted.deleted_count == 0:
         return jsonify({"error": "Report not found"}), 404
 
-    log.info(f"Report deleted by {email}: {report_id}")
+    pdf_path = report.get("pdfPath")
+    if pdf_path and os.path.exists(pdf_path):
+        try:
+            os.remove(pdf_path)
+        except OSError:
+            log.warning("Failed to remove PDF file for report %s", report_id)
+
+    log.info("Report deleted by %s: %s", email, report_id)
     return jsonify({"message": "Report deleted successfully"}), 200
 
 
-# ─── Upload + Analyze ────────────────────────────────────────────────────────
+# --- Upload + Analyze --------------------------------------------------------
 
 @api.post("/upload")
 @login_required
 def upload_scan():
     """
-    Upload a dental image, run model inference, and save a report
-    linked to the authenticated user.
+    Upload a dental image, run model inference, generate a professional PDF,
+    and save a report linked to the authenticated user.
     """
     email = g.current_user["email"]
 
@@ -174,20 +271,21 @@ def upload_scan():
     if not file.filename:
         return jsonify({"error": "No file selected"}), 400
 
-    # Validate file type
     allowed = {"png", "jpg", "jpeg", "bmp", "dicom", "dcm", "tiff", "tif"}
     ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
     if ext not in allowed:
-        return jsonify({
-            "error": f"File type '.{ext}' not supported. Use: {', '.join(sorted(allowed))}",
-        }), 400
+        return (
+            jsonify(
+                {
+                    "error": f"File type '.{ext}' not supported. Use: {', '.join(sorted(allowed))}",
+                }
+            ),
+            400,
+        )
 
-    # Read file to check size
     file_bytes = file.read()
     file_size = len(file_bytes)
-    file.seek(0)
-
-    if file_size > 10 * 1024 * 1024:  # 10 MB limit
+    if file_size > 10 * 1024 * 1024:
         return jsonify({"error": "File too large. Maximum size is 10 MB."}), 400
 
     try:
@@ -196,10 +294,15 @@ def upload_scan():
         from model_loader import model
     except Exception as exc:
         log.exception("Upload dependencies unavailable")
-        return jsonify({
-            "error": "AI dependencies are missing. Install numpy, opencv-python and ultralytics.",
-            "details": str(exc),
-        }), 500
+        return (
+            jsonify(
+                {
+                    "error": "AI dependencies are missing. Install numpy, opencv-python and ultralytics.",
+                    "details": str(exc),
+                }
+            ),
+            500,
+        )
 
     img = np.frombuffer(file_bytes, np.uint8)
     img = cv2.imdecode(img, cv2.IMREAD_COLOR)
@@ -211,88 +314,132 @@ def upload_scan():
     elapsed = perf_counter() - start_time
 
     detections = []
-    for r in results:
-        boxes = r.boxes.xyxy.cpu().numpy()
-        scores = r.boxes.conf.cpu().numpy()
+    for result in results:
+        boxes = result.boxes.xyxy.cpu().numpy()
+        scores = result.boxes.conf.cpu().numpy()
         for box, score in zip(boxes, scores):
             x1, y1, x2, y2 = box
-            detections.append({
-                "bbox": [int(x1), int(y1), int(x2), int(y2)],
-                "confidence": float(score),
-            })
+            detections.append(
+                {
+                    "bbox": [int(x1), int(y1), int(x2), int(y2)],
+                    "confidence": float(score),
+                }
+            )
 
-    top_confidence = max((d["confidence"] for d in detections), default=0)
-    confidence = round(top_confidence * 100)
     detection_count = len(detections)
+    confidence_values = [d["confidence"] * 100 for d in detections]
+    avg_confidence = round(sum(confidence_values) / detection_count, 1) if detection_count else 0.0
+    overall_confidence_level = confidence_band(avg_confidence)
+    verdict_level, verdict_text = verdict_for_detections(detection_count, confidence_values)
 
-    if detection_count == 0:
-        severity = "Low"
-        findings = "No strong caries regions detected by the model."
-        recommendations = "Continue routine oral hygiene and periodic dental checkups."
-    elif confidence >= 75:
-        severity = "High"
-        findings = f"{detection_count} high-confidence suspicious region(s) detected."
-        recommendations = "Consult a dentist soon for a detailed examination and treatment plan."
-    elif confidence >= 45:
-        severity = "Moderate"
-        findings = f"{detection_count} suspicious region(s) detected with moderate confidence."
-        recommendations = "Book a dental evaluation to confirm findings and begin early care if needed."
-    else:
-        severity = "Low"
-        findings = f"{detection_count} low-confidence suspicious region(s) detected."
-        recommendations = "Monitor symptoms and follow up during your next routine dental visit."
+    findings = (
+        "No suspicious radiographic regions were highlighted by the AI model."
+        if detection_count == 0
+        else f"{detection_count} suspicious region(s) were highlighted by AI-assisted analysis."
+    )
+    recommendations = (
+        "Continue routine oral hygiene and periodic dental checkups."
+        if verdict_level == "None"
+        else "Professional dental evaluation is recommended to confirm findings and discuss care options."
+    )
 
     now = datetime.utcnow()
-    report_name = file.filename or f"Scan {now.strftime('%Y-%m-%d %H:%M:%S')}"
-    result_summary = f"{detection_count} detection(s), severity: {severity}"
+    patient_id, patient_name = _get_or_create_patient_profile(email, g.current_user.get("name", "Patient"))
+    report_id = generate_report_id()
+
+    try:
+        annotated_image_bytes = draw_annotated_image(cv2, img, detections)
+        output_dir = os.path.join(os.path.dirname(__file__), "generated_reports")
+        pdf_path = os.path.abspath(os.path.join(output_dir, f"{report_id}.pdf"))
+
+        build_report_pdf(
+            pdf_path,
+            {
+                "patient_name": patient_name,
+                "patient_id": patient_id,
+                "report_id": report_id,
+                "analysis_date": now.strftime("%B %d, %Y"),
+                "analysis_time": now.strftime("%I:%M %p"),
+                "filename": file.filename,
+                "avg_confidence": avg_confidence,
+                "confidence_level": overall_confidence_level,
+                "detections": detections,
+                "annotated_image_bytes": annotated_image_bytes,
+                "total_detections": detection_count,
+                "verdict_level": verdict_level,
+                "verdict_text": verdict_text,
+            },
+        )
+    except Exception as exc:
+        log.exception("Failed to generate report PDF")
+        return jsonify({"error": "Failed to generate report PDF", "details": str(exc)}), 500
 
     scan_doc = {
         "user_email": email,
+        "reportId": report_id,
+        "patientId": patient_id,
         "filename": file.filename,
-        "reportName": report_name,
-        "fileSize": f"{file_size / 1024:.1f} KB",
+        "reportName": f"Dental Caries Detection Report - {report_id}",
         "date": now,
-        "confidence": confidence,
-        "severity": severity,
-        "findings": findings,
-        "recommendations": recommendations,
-        "analysisTime": f"{elapsed:.2f} seconds",
+        "analysisDate": now.strftime("%B %d, %Y"),
+        "analysisTimeOfDay": now.strftime("%I:%M %p"),
+        "analysisDuration": f"{elapsed:.2f} seconds",
+        "fileSize": f"{file_size / 1024:.1f} KB",
         "imageSize": (
             f"{file_size / (1024 * 1024):.2f} MB"
             if file_size > 1024 * 1024
             else f"{file_size / 1024:.1f} KB"
         ),
-        "resultSummary": result_summary,
-        "detections": detections,
+        "totalDetections": detection_count,
         "detectionCount": detection_count,
+        "averageConfidence": avg_confidence,
+        "confidence": avg_confidence,
+        "overallConfidenceLevel": overall_confidence_level,
+        "severity": overall_confidence_level,
+        "finalVerdictLevel": verdict_level,
+        "verdictText": verdict_text,
+        "findings": findings,
+        "recommendations": recommendations,
+        "resultSummary": f"{detection_count} detection(s) found. Confidence level: {overall_confidence_level}.",
+        "generatedBy": f"{APP_NAME} {APP_GENERATOR}",
+        "pdfPath": pdf_path,
+        "pdfFileName": os.path.basename(pdf_path),
+        "detections": detections,
         "status": "Completed",
     }
 
     result = scans.insert_one(scan_doc)
-    log.info(f"New scan uploaded by {email}: {result.inserted_id}")
+    log.info("New scan uploaded by %s: %s", email, result.inserted_id)
 
-    return jsonify({
-        "message": "Image uploaded and analyzed successfully",
-        "reportId": str(result.inserted_id),
-        "reportName": report_name,
-        "date": now.strftime("%Y-%m-%d"),
-        "severity": severity,
-        "confidence": confidence,
-        "findings": findings,
-        "recommendations": recommendations,
-        "resultSummary": result_summary,
-        "detections": detections,
-    }), 201
+    return (
+        jsonify(
+            {
+                "message": "Analysis Complete",
+                "reportDbId": str(result.inserted_id),
+                "reportId": report_id,
+                "patientId": patient_id,
+                "date": now.strftime("%Y-%m-%d"),
+                "time": now.strftime("%I:%M %p"),
+                "totalDetections": detection_count,
+                "averageConfidence": avg_confidence,
+                "overallConfidenceLevel": overall_confidence_level,
+                "finalVerdictLevel": verdict_level,
+                "resultSummary": scan_doc["resultSummary"],
+                "pdfDownloadUrl": f"/api/reports/{result.inserted_id}/pdf",
+            }
+        ),
+        201,
+    )
 
 
-# ─── Predict Route ───────────────────────────────────────────────────────────
+# --- Predict Route -----------------------------------------------------------
 
-@api.route('/predict', methods=['POST'])
+@api.route("/predict", methods=["POST"])
 def predict():
-    if 'image' not in request.files:
+    if "image" not in request.files:
         return jsonify({"error": "No image uploaded. Use form-data key 'image'."}), 400
 
-    file = request.files['image']
+    file = request.files["image"]
 
     try:
         np = importlib.import_module("numpy")
@@ -300,33 +447,36 @@ def predict():
         from model_loader import model
     except Exception as exc:
         log.exception("Predict dependencies unavailable")
-        return jsonify({
-            "error": "AI dependencies are missing. Install numpy, opencv-python and ultralytics.",
-            "details": str(exc),
-        }), 500
+        return (
+            jsonify(
+                {
+                    "error": "AI dependencies are missing. Install numpy, opencv-python and ultralytics.",
+                    "details": str(exc),
+                }
+            ),
+            500,
+        )
 
-    # Convert image to numpy
     img = np.frombuffer(file.read(), np.uint8)
     img = cv2.imdecode(img, cv2.IMREAD_COLOR)
 
     if img is None:
         return jsonify({"error": "Invalid or unreadable image file."}), 400
 
-    # Run model
     results = model(img)
-
     detections = []
 
-    for r in results:
-        boxes = r.boxes.xyxy.cpu().numpy()
-        scores = r.boxes.conf.cpu().numpy()
+    for result in results:
+        boxes = result.boxes.xyxy.cpu().numpy()
+        scores = result.boxes.conf.cpu().numpy()
 
         for box, score in zip(boxes, scores):
             x1, y1, x2, y2 = box
-
-            detections.append({
-                "bbox": [int(x1), int(y1), int(x2), int(y2)],
-                "confidence": float(score)
-            })
+            detections.append(
+                {
+                    "bbox": [int(x1), int(y1), int(x2), int(y2)],
+                    "confidence": float(score),
+                }
+            )
 
     return jsonify({"detections": detections})
