@@ -55,26 +55,26 @@ const LandingPage = () => {
         <div className="features-grid">
           <Card className="feature-card">
             <div className="feature-icon">🦷</div>
-            <h3>Made for Sindh Clinics</h3>
+            <h3>Made for Common Users </h3>
             <p>
-              Built for local dental workflows in Sindh, so dentists can check
-              cavity risk quickly and explain results easily to patients.
+              Built for common public , so users can check cavity risk quickly
+              and get to know about dental results easily .
             </p>
           </Card>
           <Card className="feature-card">
             <div className="feature-icon">📋</div>
-            <h3>Simple Urdu/English-Friendly Reports</h3>
+            <h3>Detailed User Reports</h3>
             <p>
-              Clear, easy-to-read reports help families in Sindh understand
-              dental findings and follow the dentist's advice with confidence.
+              Clear, easy-to-read reports help user understand dental findings
+              and follow the measures with confidence.
             </p>
           </Card>
           <Card className="feature-card">
             <div className="feature-icon">⚡</div>
-            <h3>Fast Results for Busy OPDs</h3>
+            <h3>Fast Results </h3>
             <p>
-              Upload X-rays in seconds and get AI support quickly, which is
-              ideal for high patient volume in public and private setups.
+              Upload simple mobile images in seconds and get AI support quickly,
+              which is ideal for dental awareness .
             </p>
           </Card>
         </div>
@@ -87,7 +87,7 @@ const LandingPage = () => {
           <div className="step">
             <div className="step-number">1</div>
             <h3>Upload Image</h3>
-            <p>Upload dental X-rays or photos from your device</p>
+            <p>Upload dental photos from your device</p>
           </div>
           <div className="step-arrow">→</div>
           <div className="step">
