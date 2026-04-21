@@ -9,7 +9,6 @@ so users can only access their own data.
 import importlib
 import logging
 import os
-import sys
 from datetime import datetime
 from time import perf_counter
 
@@ -76,6 +75,35 @@ def _serialize_report(report: dict) -> dict:
         "finalVerdictLevel": report.get("finalVerdictLevel", "None"),
         "pdfAvailable": bool(report.get("pdfPath")),
     }
+
+
+def _load_ai_dependencies():
+    np = importlib.import_module("numpy")
+    cv2 = importlib.import_module("cv2")
+    from model_loader import model
+
+    return np, cv2, model
+
+
+def _extract_detections(results) -> list[dict]:
+    detections: list[dict] = []
+    for result in results:
+        boxes = getattr(result, "boxes", None)
+        if boxes is None or boxes.xyxy is None or boxes.conf is None:
+            continue
+
+        box_values = boxes.xyxy.cpu().numpy()
+        confidence_values = boxes.conf.cpu().numpy()
+        for box, score in zip(box_values, confidence_values):
+            x1, y1, x2, y2 = box
+            detections.append(
+                {
+                    "bbox": [int(x1), int(y1), int(x2), int(y2)],
+                    "confidence": float(score),
+                }
+            )
+
+    return detections
 
 
 # --- Dashboard Stats ---------------------------------------------------------
@@ -290,17 +318,13 @@ def upload_scan():
         return jsonify({"error": "File too large. Maximum size is 10 MB."}), 400
 
     try:
-        np = importlib.import_module("numpy")
-        cv2 = importlib.import_module("cv2")
-        from model_loader import model
+        np, cv2, model = _load_ai_dependencies()
     except Exception as exc:
         log.exception("Upload dependencies unavailable")
         return (
             jsonify(
                 {
                     "error": "AI dependencies are missing. Install numpy, opencv-python and ultralytics.",
-                    "python_executable": sys.executable,
-                    "fix": f"Run: {sys.executable} -m pip install numpy opencv-python ultralytics",
                     "details": str(exc),
                 }
             ),
@@ -312,44 +336,15 @@ def upload_scan():
     if img is None:
         return jsonify({"error": "Invalid or unreadable image file."}), 400
 
-    try:
-        start_time = perf_counter()
-        results = model(img)
-        elapsed = perf_counter() - start_time
+    start_time = perf_counter()
+    results = model.predict(source=img, verbose=False)
+    elapsed = perf_counter() - start_time
 
-        detections = []
-        for result in results:
-            if result.boxes is None:
-                continue
-            boxes = result.boxes.xyxy.cpu().numpy()
-            scores = result.boxes.conf.cpu().numpy()
-            for box, score in zip(boxes, scores):
-                x1, y1, x2, y2 = box
-                detections.append(
-                    {
-                        "bbox": [int(x1), int(y1), int(x2), int(y2)],
-                        "confidence": float(score),
-                    }
-                )
-    except Exception as exc:
-        log.exception("AI inference failed")
-        return jsonify({"error": "AI inference failed", "details": str(exc)}), 500
+    detections = _extract_detections(results)
 
     detection_count = len(detections)
     confidence_values = [d["confidence"] * 100 for d in detections]
     avg_confidence = round(sum(confidence_values) / detection_count, 1) if detection_count else 0.0
-
-    # Skip report creation for non-relevant uploads with zero confidence.
-    if avg_confidence <= 0:
-        return (
-            jsonify(
-                {
-                    "error": "No relevant dental findings were detected. Report was not generated.",
-                    "reportGenerated": False,
-                }
-            ),
-            422,
-        )
 
     overall_confidence_level = confidence_band(avg_confidence)
     verdict_level, verdict_text = verdict_for_detections(detection_count, confidence_values)
@@ -430,12 +425,7 @@ def upload_scan():
         "status": "Completed",
     }
 
-    try:
-        result = scans.insert_one(scan_doc)
-    except Exception as exc:
-        log.exception("Failed to save scan report to database")
-        return jsonify({"error": "Failed to save scan report", "details": str(exc)}), 500
-
+    result = scans.insert_one(scan_doc)
     log.info("New scan uploaded by %s: %s", email, result.inserted_id)
 
     return (
@@ -469,9 +459,7 @@ def predict():
     file = request.files["image"]
 
     try:
-        np = importlib.import_module("numpy")
-        cv2 = importlib.import_module("cv2")
-        from model_loader import model
+        np, cv2, model = _load_ai_dependencies()
     except Exception as exc:
         log.exception("Predict dependencies unavailable")
         return (
@@ -490,20 +478,7 @@ def predict():
     if img is None:
         return jsonify({"error": "Invalid or unreadable image file."}), 400
 
-    results = model(img)
-    detections = []
-
-    for result in results:
-        boxes = result.boxes.xyxy.cpu().numpy()
-        scores = result.boxes.conf.cpu().numpy()
-
-        for box, score in zip(boxes, scores):
-            x1, y1, x2, y2 = box
-            detections.append(
-                {
-                    "bbox": [int(x1), int(y1), int(x2), int(y2)],
-                    "confidence": float(score),
-                }
-            )
+    results = model.predict(source=img, verbose=False)
+    detections = _extract_detections(results)
 
     return jsonify({"detections": detections})

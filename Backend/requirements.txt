@@ -14,7 +14,9 @@ python-dotenv==1.2.1
 requests==2.32.3
 Werkzeug==3.1.5
 reportlab==4.4.4
-ultralytics
 numpy
 opencv-python
 Pillow
+torch
+torchvision
+ultralytics
