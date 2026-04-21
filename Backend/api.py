@@ -9,6 +9,7 @@ so users can only access their own data.
 import importlib
 import logging
 import os
+import sys
 from datetime import datetime
 from time import perf_counter
 
@@ -298,6 +299,8 @@ def upload_scan():
             jsonify(
                 {
                     "error": "AI dependencies are missing. Install numpy, opencv-python and ultralytics.",
+                    "python_executable": sys.executable,
+                    "fix": f"Run: {sys.executable} -m pip install numpy opencv-python ultralytics",
                     "details": str(exc),
                 }
             ),
@@ -309,22 +312,28 @@ def upload_scan():
     if img is None:
         return jsonify({"error": "Invalid or unreadable image file."}), 400
 
-    start_time = perf_counter()
-    results = model(img)
-    elapsed = perf_counter() - start_time
+    try:
+        start_time = perf_counter()
+        results = model(img)
+        elapsed = perf_counter() - start_time
 
-    detections = []
-    for result in results:
-        boxes = result.boxes.xyxy.cpu().numpy()
-        scores = result.boxes.conf.cpu().numpy()
-        for box, score in zip(boxes, scores):
-            x1, y1, x2, y2 = box
-            detections.append(
-                {
-                    "bbox": [int(x1), int(y1), int(x2), int(y2)],
-                    "confidence": float(score),
-                }
-            )
+        detections = []
+        for result in results:
+            if result.boxes is None:
+                continue
+            boxes = result.boxes.xyxy.cpu().numpy()
+            scores = result.boxes.conf.cpu().numpy()
+            for box, score in zip(boxes, scores):
+                x1, y1, x2, y2 = box
+                detections.append(
+                    {
+                        "bbox": [int(x1), int(y1), int(x2), int(y2)],
+                        "confidence": float(score),
+                    }
+                )
+    except Exception as exc:
+        log.exception("AI inference failed")
+        return jsonify({"error": "AI inference failed", "details": str(exc)}), 500
 
     detection_count = len(detections)
     confidence_values = [d["confidence"] * 100 for d in detections]
@@ -421,7 +430,12 @@ def upload_scan():
         "status": "Completed",
     }
 
-    result = scans.insert_one(scan_doc)
+    try:
+        result = scans.insert_one(scan_doc)
+    except Exception as exc:
+        log.exception("Failed to save scan report to database")
+        return jsonify({"error": "Failed to save scan report", "details": str(exc)}), 500
+
     log.info("New scan uploaded by %s: %s", email, result.inserted_id)
 
     return (

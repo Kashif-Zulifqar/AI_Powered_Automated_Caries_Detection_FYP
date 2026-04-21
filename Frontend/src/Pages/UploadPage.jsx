@@ -78,10 +78,27 @@ const UploadPage = () => {
         method: "POST",
         body: formData,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Detection failed");
+
+      const raw = await res.text();
+      let data = null;
+      if (raw) {
+        try {
+          data = JSON.parse(raw);
+        } catch {
+          data = null;
+        }
       }
+
+      if (!res.ok) {
+        const backendError = data?.error || data?.message;
+        const fallbackError = raw?.trim() || `Detection failed (HTTP ${res.status})`;
+        throw new Error(backendError || fallbackError);
+      }
+
+      if (!data || typeof data !== "object") {
+        throw new Error("Server returned an invalid response format.");
+      }
+
       setResult(data);
 
       clearInterval(interval);

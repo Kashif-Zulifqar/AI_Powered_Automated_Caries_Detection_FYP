@@ -1,25 +1,59 @@
 import os
-import site
+import subprocess
 import sys
 from pathlib import Path
 
 
-def _ensure_project_venv_packages():
-    """Load local .venv packages when launched from a non-venv interpreter."""
-    if os.environ.get("VIRTUAL_ENV"):
+def _configure_windows_dll_paths(project_root: Path):
+    """Expose venv DLL directories when loading native wheels on Windows."""
+    if os.name != "nt":
         return
 
+    dll_dirs = [
+        project_root / ".venv" / "Scripts",
+        project_root / ".venv" / "Library" / "bin",
+        project_root / ".venv" / "Lib" / "site-packages" / "torch" / "lib",
+    ]
+
+    for dll_dir in dll_dirs:
+        if not dll_dir.exists():
+            continue
+
+        os.environ["PATH"] = f"{dll_dir}{os.pathsep}{os.environ.get('PATH', '')}"
+        try:
+            os.add_dll_directory(str(dll_dir))
+        except (AttributeError, FileNotFoundError):
+            pass
+
+
+def _ensure_project_venv_runtime():
+    """Re-exec with local .venv python so AI dependencies load consistently."""
     project_root = Path(__file__).resolve().parent.parent
-    venv_site = project_root / ".venv" / "Lib" / "site-packages"
-    if venv_site.exists() and str(venv_site) not in sys.path:
-        site.addsitedir(str(venv_site))
+    venv_python = project_root / ".venv" / "Scripts" / "python.exe"
+
+    if os.name == "nt" and venv_python.exists():
+        current = Path(sys.executable).resolve()
+        target = venv_python.resolve()
+        if current != target and os.environ.get("DENTALAI_VENV_BOOTSTRAPPED") != "1":
+            env = os.environ.copy()
+            env["DENTALAI_VENV_BOOTSTRAPPED"] = "1"
+            env["VIRTUAL_ENV"] = str(project_root / ".venv")
+            code = subprocess.call(
+                [str(target), str(Path(__file__).resolve()), *sys.argv[1:]],
+                cwd=str(Path(__file__).resolve().parent),
+                env=env,
+            )
+            raise SystemExit(code)
+
+    _configure_windows_dll_paths(project_root)
 
 
-_ensure_project_venv_packages()
+_ensure_project_venv_runtime()
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from dotenv import load_dotenv
+from werkzeug.exceptions import HTTPException
 from auth import auth
 from api import api
 
@@ -65,6 +99,24 @@ def create_app():
         view_func=app.view_functions["api.predict"],
         methods=["POST"],
     )
+
+    def _wants_json_errors() -> bool:
+        if request.path.startswith("/api/") or request.path == "/predict":
+            return True
+        return "application/json" in (request.headers.get("Accept") or "")
+
+    @app.errorhandler(HTTPException)
+    def handle_http_exception(exc: HTTPException):
+        if _wants_json_errors():
+            return jsonify({"error": exc.description}), exc.code
+        return exc
+
+    @app.errorhandler(Exception)
+    def handle_unexpected_exception(exc: Exception):
+        app.logger.exception("Unhandled backend error")
+        if _wants_json_errors():
+            return jsonify({"error": "Internal server error", "details": str(exc)}), 500
+        return jsonify({"error": "Internal server error"}), 500
 
     return app
 

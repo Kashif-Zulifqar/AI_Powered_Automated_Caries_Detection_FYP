@@ -44,3 +44,6 @@ DEV_MODE=false
 ```
 
 With at least one transport configured, `/auth/register-start`, `/auth/forgot-start`, and `/auth/test-email` will deliver OTPs without needing to switch code branches.
+
+
+This is it.
