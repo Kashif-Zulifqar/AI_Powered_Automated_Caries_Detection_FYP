@@ -54,27 +54,27 @@ const LandingPage = () => {
         <h2>Why Choose DentalAI?</h2>
         <div className="features-grid">
           <Card className="feature-card">
-            <div className="feature-icon">🤖</div>
-            <h3>AI Detection</h3>
+            <div className="feature-icon">🦷</div>
+            <h3>Made for Sindh Clinics</h3>
             <p>
-              Advanced machine learning algorithms analyze dental images with
-              high accuracy
+              Built for local dental workflows in Sindh, so dentists can check
+              cavity risk quickly and explain results easily to patients.
             </p>
           </Card>
           <Card className="feature-card">
-            <div className="feature-icon">🔒</div>
-            <h3>Secure Reports</h3>
+            <div className="feature-icon">📋</div>
+            <h3>Simple Urdu/English-Friendly Reports</h3>
             <p>
-              Your medical data is encrypted and stored securely with full HIPAA
-              compliance
+              Clear, easy-to-read reports help families in Sindh understand
+              dental findings and follow the dentist's advice with confidence.
             </p>
           </Card>
           <Card className="feature-card">
-            <div className="feature-icon">📤</div>
-            <h3>Easy Upload</h3>
+            <div className="feature-icon">⚡</div>
+            <h3>Fast Results for Busy OPDs</h3>
             <p>
-              Simple drag-and-drop interface or capture images directly from
-              your device
+              Upload X-rays in seconds and get AI support quickly, which is
+              ideal for high patient volume in public and private setups.
             </p>
           </Card>
         </div>
@@ -104,42 +104,7 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Testimonials Section */}
-      <section id="testimonials" className="testimonials">
-        <h2>What Our Users Say</h2>
-        <div className="testimonials-grid">
-          <Card className="testimonial-card">
-            <p>
-              "DentalAI has revolutionized our dental practice. The accuracy is
-              remarkable!"
-            </p>
-            <div className="testimonial-author">
-              <strong>Dr. Michael Chen</strong>
-              <span>Dental Surgeon</span>
-            </div>
-          </Card>
-          <Card className="testimonial-card">
-            <p>
-              "Fast, reliable, and easy to use. This tool saves us hours every
-              week."
-            </p>
-            <div className="testimonial-author">
-              <strong>Dr. Emily Roberts</strong>
-              <span>Orthodontist</span>
-            </div>
-          </Card>
-          <Card className="testimonial-card">
-            <p>
-              "The AI detection catches things we might have missed. Truly
-              impressive technology."
-            </p>
-            <div className="testimonial-author">
-              <strong>Dr. James Wilson</strong>
-              <span>General Dentist</span>
-            </div>
-          </Card>
-        </div>
-      </section>
+      {/* Testimonials section hidden for now */}
 
       <Footer />
     </div>

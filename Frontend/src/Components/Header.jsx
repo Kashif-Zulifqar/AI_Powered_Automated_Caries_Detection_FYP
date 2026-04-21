@@ -35,7 +35,7 @@ const Header = ({ isLanding = false, minimal = false }) => {
   const isActive = (path) => activePath === path;
 
   const handleLogoClick = () => {
-    navigate("/");
+    navigate(isAuthenticated ? "/dashboard" : "/");
     setMobileOpen(false);
   };
 
@@ -84,7 +84,6 @@ const Header = ({ isLanding = false, minimal = false }) => {
               <>
                 <a href="#features">Features</a>
                 <a href="#how-it-works">How It Works</a>
-                <a href="#testimonials">Testimonials</a>
                 <Button
                   variant="outline"
                   className={isActive("/login") ? "nav-btn-active" : ""}
