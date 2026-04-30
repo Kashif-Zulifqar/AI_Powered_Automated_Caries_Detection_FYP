@@ -18,6 +18,17 @@ const ReportDetailsPage = () => {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const readResponseData = async (response) => {
+    const text = await response.text();
+    if (!text) return {};
+
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { error: text };
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -27,8 +38,8 @@ const ReportDetailsPage = () => {
           if (res.ok) {
             setReport(await res.json());
           } else {
-            const err = await res.json();
-            addToast(err.error || "Report not found", "error");
+            const err = await readResponseData(res);
+            addToast(err.error || err.message || "Report not found", "error");
             navigate("/history");
           }
         }

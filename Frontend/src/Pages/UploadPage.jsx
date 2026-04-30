@@ -20,6 +20,17 @@ const UploadPage = () => {
   //const navigate = useNavigate();
   const fileInputRef = useRef(null);
 
+  const readResponseData = async (response) => {
+    const text = await response.text();
+    if (!text) return {};
+
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { error: text };
+    }
+  };
+
   const handleDragOver = (e) => {
     e.preventDefault();
     setIsDragging(true);
@@ -78,9 +89,9 @@ const UploadPage = () => {
         method: "POST",
         body: formData,
       });
-      const data = await res.json();
+      const data = await readResponseData(res);
       if (!res.ok) {
-        throw new Error(data.error || "Detection failed");
+        throw new Error(data.error || data.message || "Detection failed");
       }
       setResult(data);
 
@@ -219,7 +230,7 @@ const UploadPage = () => {
                 Total Detections: {result.totalDetections ?? 0}
               </p>
               <p className="result-pill">
-                Overall Confidence Level:{" "}
+                Overall Confidence Level: {" "}
                 {result.overallConfidenceLevel || "Low"}
               </p>
               <div className="result-actions">
