@@ -85,7 +85,7 @@ def _load_ai_dependencies():
     return np, cv2, model
 
 
-def _extract_detections(results) -> list[dict]:
+def _extract_detections(results, class_names=None) -> list[dict]:
     detections: list[dict] = []
     for result in results:
         boxes = getattr(result, "boxes", None)
@@ -94,12 +94,24 @@ def _extract_detections(results) -> list[dict]:
 
         box_values = boxes.xyxy.cpu().numpy()
         confidence_values = boxes.conf.cpu().numpy()
-        for box, score in zip(box_values, confidence_values):
+        class_values = getattr(boxes, "cls", None)
+        class_values = class_values.cpu().numpy() if class_values is not None else None
+
+        if class_values is None:
+            class_values = [None] * len(box_values)
+
+        result_names = getattr(result, "names", None) or class_names or {}
+
+        for box, score, class_id in zip(box_values, confidence_values, class_values):
             x1, y1, x2, y2 = box
+            class_id = int(class_id) if class_id is not None else None
+            class_name = result_names.get(class_id, str(class_id)) if class_id is not None else None
             detections.append(
                 {
                     "bbox": [int(x1), int(y1), int(x2), int(y2)],
                     "confidence": float(score),
+                    "class_id": class_id,
+                    "class_name": class_name,
                 }
             )
 
@@ -143,7 +155,7 @@ def dashboard_stats():
             / total
         )
 
-    now = datetime.utcnow()
+    now = datetime.now()
     this_month = sum(
         1
         for s in user_scans
@@ -340,19 +352,35 @@ def upload_scan():
     results = model.predict(source=img, verbose=False)
     elapsed = perf_counter() - start_time
 
-    detections = _extract_detections(results)
+    detections = _extract_detections(results, getattr(model, "names", None))
 
-    detection_count = len(detections)
-    confidence_values = [d["confidence"] * 100 for d in detections]
-    avg_confidence = round(sum(confidence_values) / detection_count, 1) if detection_count else 0.0
+    cavity_detections = [d for d in detections if d.get("class_name") == "cavity"]
+    cavity_count = len(cavity_detections)
+    confidence_values = [d["confidence"] * 100 for d in cavity_detections]
+    class_names = [d.get("class_name") for d in cavity_detections]
+    avg_confidence = round(sum(confidence_values) / cavity_count, 1) if cavity_count else 0.0
+    max_confidence = round(max(confidence_values), 1) if confidence_values else 0.0
 
-    overall_confidence_level = confidence_band(avg_confidence)
-    verdict_level, verdict_text = verdict_for_detections(detection_count, confidence_values)
+    if cavity_count == 0:
+        overall_confidence_level = "No cavity detected"
+    elif max_confidence >= 75:
+        overall_confidence_level = "High"
+    elif max_confidence >= 50:
+        overall_confidence_level = "Moderate"
+    else:
+        overall_confidence_level = "Detected"
+    verdict_level, verdict_text = verdict_for_detections(cavity_count, confidence_values, class_names)
+    if cavity_count == 0:
+        confidence_summary = "No cavity detected"
+    elif cavity_count == 1:
+        confidence_summary = f"Single cavity detected ({max_confidence:.1f}% max confidence)"
+    else:
+        confidence_summary = f"{cavity_count} cavity detections, {max_confidence:.1f}% max confidence"
 
     findings = (
-        "No suspicious radiographic regions were highlighted by the AI model."
-        if detection_count == 0
-        else f"{detection_count} suspicious region(s) were highlighted by AI-assisted analysis."
+        "No cavity was detected by the AI model. No bounding boxes are shown in the report."
+        if cavity_count == 0
+        else f"{cavity_count} cavity region(s) were highlighted by AI-assisted analysis with up to {max_confidence:.1f}% model confidence."
     )
     recommendations = (
         "Continue routine oral hygiene and periodic dental checkups."
@@ -360,12 +388,12 @@ def upload_scan():
         else "Professional dental evaluation is recommended to confirm findings and discuss care options."
     )
 
-    now = datetime.utcnow()
+    now = datetime.now()
     patient_id, patient_name = _get_or_create_patient_profile(email, g.current_user.get("name", "Patient"))
     report_id = generate_report_id()
 
     try:
-        annotated_image_bytes = draw_annotated_image(cv2, img, detections)
+        annotated_image_bytes = draw_annotated_image(cv2, img, cavity_detections)
         output_dir = os.path.join(os.path.dirname(__file__), "generated_reports")
         pdf_path = os.path.abspath(os.path.join(output_dir, f"{report_id}.pdf"))
 
@@ -379,10 +407,13 @@ def upload_scan():
                 "analysis_time": now.strftime("%I:%M %p"),
                 "filename": file.filename,
                 "avg_confidence": avg_confidence,
+                "max_confidence": max_confidence,
+                "confidence_summary": confidence_summary,
                 "confidence_level": overall_confidence_level,
-                "detections": detections,
+                "detections": cavity_detections,
                 "annotated_image_bytes": annotated_image_bytes,
-                "total_detections": detection_count,
+                "total_detections": cavity_count,
+                "cavity_count": cavity_count,
                 "verdict_level": verdict_level,
                 "verdict_text": verdict_text,
             },
@@ -407,8 +438,8 @@ def upload_scan():
             if file_size > 1024 * 1024
             else f"{file_size / 1024:.1f} KB"
         ),
-        "totalDetections": detection_count,
-        "detectionCount": detection_count,
+        "totalDetections": cavity_count,
+        "detectionCount": cavity_count,
         "averageConfidence": avg_confidence,
         "confidence": avg_confidence,
         "overallConfidenceLevel": overall_confidence_level,
@@ -417,11 +448,12 @@ def upload_scan():
         "verdictText": verdict_text,
         "findings": findings,
         "recommendations": recommendations,
-        "resultSummary": f"{detection_count} detection(s) found. Confidence level: {overall_confidence_level}.",
+        "resultSummary": f"{confidence_summary}.",
+                "confidenceSummary": confidence_summary,
         "generatedBy": f"{APP_NAME} {APP_GENERATOR}",
         "pdfPath": pdf_path,
         "pdfFileName": os.path.basename(pdf_path),
-        "detections": detections,
+        "detections": cavity_detections,
         "status": "Completed",
     }
 
@@ -437,10 +469,12 @@ def upload_scan():
                 "patientId": patient_id,
                 "date": now.strftime("%Y-%m-%d"),
                 "time": now.strftime("%I:%M %p"),
-                "totalDetections": detection_count,
+                "totalDetections": cavity_count,
                 "averageConfidence": avg_confidence,
+                "maxConfidence": max_confidence,
                 "overallConfidenceLevel": overall_confidence_level,
                 "finalVerdictLevel": verdict_level,
+                "confidenceSummary": confidence_summary,
                 "resultSummary": scan_doc["resultSummary"],
                 "pdfDownloadUrl": f"/api/reports/{result.inserted_id}/pdf",
             }
@@ -479,6 +513,6 @@ def predict():
         return jsonify({"error": "Invalid or unreadable image file."}), 400
 
     results = model.predict(source=img, verbose=False)
-    detections = _extract_detections(results)
+    detections = _extract_detections(results, getattr(model, "names", None))
 
     return jsonify({"detections": detections})
